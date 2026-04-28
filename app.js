@@ -234,6 +234,11 @@ async function vote(value) {
     render();
     return;
   }
+  if (current.votes?.[appState.user.id]) {
+    toast("Tu voto ya quedo registrado.");
+    render();
+    return;
+  }
   await upsertSession(appState.code, (session) => ({
     ...session,
     votes: {
@@ -441,16 +446,15 @@ function welcomeView() {
           <button class="icon-button" data-action="toggleDark" aria-label="Cambiar tema">◐</button>
         </div>
         <div class="hero-copy">
-          <p class="eyebrow">Vicepresidencia Experiencia Usuario Cliente</p>
           <h1>Retox</h1>
-          <p>Votaciones en vivo, agiles y visuales para activar conversaciones con usuarios, empleados y clientes.</p>
+          <p>Opina, participa y ve resultados en tiempo real. Así funciona Retox.</p>
         </div>
         <div class="entry-grid">
           <form data-action="hostAccessForm" class="entry-card">
             <h2>Entrar como host</h2>
             <label for="host-password">Contraseña</label>
             <div class="inline-form">
-              <input id="host-password" name="hostPassword" type="password" placeholder="Experiencia" autocomplete="current-password" />
+              <input id="host-password" name="hostPassword" type="password" placeholder="Contraseña" autocomplete="current-password" />
               <button class="primary" type="submit">Entrar</button>
             </div>
           </form>
@@ -592,6 +596,7 @@ function waitingView(session) {
   const stats = computeStats(session);
   const voted = Boolean(session.votes[appState.user?.id]);
   const closed = isSessionClosed(session);
+  const locked = closed || voted;
   return `
     <main class="app-grid">
       ${roomHeader(session)}
@@ -607,7 +612,7 @@ function waitingView(session) {
       <section class="vote-board">
         ${Array.from({ length: 10 }, (_, index) => {
           const value = index + 1;
-          return `<button class="vote-tile ${voted && session.votes[appState.user.id].value === value ? "selected" : ""}" data-vote="${value}" ${closed ? "disabled" : ""}>${value}</button>`;
+          return `<button class="vote-tile ${voted && session.votes[appState.user.id].value === value ? "selected" : ""}" data-vote="${value}" ${locked ? "disabled" : ""}>${value}</button>`;
         }).join("")}
       </section>
       <section class="panel compact">
@@ -659,7 +664,10 @@ function hostView(session) {
         <section class="panel">
           <p class="eyebrow">Codigo de sala</p>
           <div class="room-code">${session.code}</div>
-          <input class="share-link" readonly value="${links.participant}" aria-label="Link de invitacion" />
+          <div class="share-row">
+            <input class="share-link" readonly value="${links.participant}" aria-label="Link de invitacion" />
+            <button class="secondary copy-button" data-copy-url="${links.participant}">Copiar URL</button>
+          </div>
         </section>
         <section class="panel">
           <form data-action="questionForm">
@@ -745,6 +753,21 @@ function toast(message) {
   setTimeout(() => node.remove(), 2200);
 }
 
+async function copyToClipboard(value) {
+  try {
+    await navigator.clipboard.writeText(value);
+    toast("URL copiada.");
+  } catch {
+    const input = document.createElement("input");
+    input.value = value;
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand("copy");
+    input.remove();
+    toast("URL copiada.");
+  }
+}
+
 function render() {
   const root = document.querySelector("#app");
   document.body.classList.toggle("dark", appState.dark);
@@ -795,8 +818,10 @@ document.addEventListener("click", async (event) => {
   const action = event.target.closest("[data-action]")?.dataset.action;
   const voteValue = event.target.closest("[data-vote]")?.dataset.vote;
   const exportCode = event.target.closest("[data-export-code]")?.dataset.exportCode;
+  const copyUrl = event.target.closest("[data-copy-url]")?.dataset.copyUrl;
   if (voteValue) await vote(Number(voteValue));
   if (exportCode) exportSessionResults(getSession(exportCode));
+  if (copyUrl) await copyToClipboard(copyUrl);
   if (action === "resetVotes") await resetVotes();
   if (action === "addDemoVotes") await addDemoVotes();
   if (action === "exportResults") exportResults();

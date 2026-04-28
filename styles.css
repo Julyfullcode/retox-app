@@ -227,22 +227,20 @@ textarea:focus {
 
 .primary,
 .secondary,
-.host-actions button {
+.host-actions button,
+.compact-button {
   min-height: 48px;
   border-radius: 8px;
   padding: 0 18px;
   font-weight: 800;
 }
 
-.primary {
+.primary,
+.secondary,
+.host-actions button,
+.compact-button {
   background: linear-gradient(135deg, var(--green), var(--green-2));
   color: #fff;
-}
-
-.secondary,
-.host-actions button {
-  background: #e9f6ee;
-  color: var(--green);
 }
 
 .full {
@@ -591,9 +589,9 @@ fieldset {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 18px;
-  min-height: 344px;
+  min-height: 304px;
   border-radius: 8px;
-  padding: clamp(18px, 5vw, 42px);
+  padding: clamp(14px, 3vw, 28px);
   background:
     linear-gradient(135deg, rgba(11, 143, 72, 0.94), rgba(31, 111, 178, 0.9)),
     var(--green);
@@ -671,8 +669,20 @@ fieldset {
 }
 
 .share-link {
-  margin-top: 12px;
   font-size: 0.9rem;
+}
+
+.share-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.copy-button {
+  min-height: 46px;
+  white-space: nowrap;
 }
 
 .host-actions {
@@ -864,7 +874,11 @@ footer {
   .results-stage {
     grid-template-columns: 1fr;
     justify-items: center;
-    min-height: 284px;
+    min-height: 264px;
+  }
+
+  .share-row {
+    grid-template-columns: 1fr;
   }
 
   .brand-mark {
