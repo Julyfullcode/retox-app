@@ -1,0 +1,698 @@
+const STORAGE_KEY = "retox.sessions.v1";
+const ACTIVE_USER_KEY = "retox.activeUser.v1";
+const broadcast = "BroadcastChannel" in window ? new BroadcastChannel("retox-realtime") : null;
+const SUPABASE_URL = "https://oixqthwwjvvspsuwfhme.supabase.co";
+const SUPABASE_KEY = "sb_publishable_WaBBzhjih4wZiDGnnfprVw_zcp4Y63_";
+const SUPABASE_TABLE = "retox_sessions";
+const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY) || null;
+let sessionCache = readLocalSessions();
+let realtimeChannel = null;
+let remoteReady = false;
+
+const avatars = [
+  ["robot-bailarin", "Robot bailarin", "🤖", "#dff6ee"],
+  ["emoji-nerd", "Emoji nerd", "🤓", "#ecf9d5"],
+  ["llama-gafas", "Llama con gafas", "🦙", "#dceefd"],
+  ["pulpo-dj", "Pulpo DJ", "🐙", "#f0e5ff"],
+  ["cactus-ceo", "Cactus CEO", "🌵", "#e4f5dd"],
+  ["astronauta", "Astronauta paisa", "🧑‍🚀", "#e8f1ff"],
+  ["tiburon", "Tiburon amable", "🦈", "#d8f4ff"],
+  ["unicornio", "Unicornio sprint", "🦄", "#ffe8f4"],
+  ["ninja", "Ninja UX", "🥷", "#edf0f2"],
+  ["mago", "Mago de datos", "🧙", "#e7f9ef"],
+  ["dino", "Dino curioso", "🦖", "#eaf8dd"],
+  ["fantasma", "Fantasma feliz", "👻", "#eff6ff"],
+  ["pizza", "Pizza analitica", "🍕", "#fff0db"],
+  ["koala", "Koala tester", "🐨", "#eef2f3"],
+  ["marciano", "Marciano wow", "👽", "#e8fbdf"],
+  ["gato", "Gato estratega", "🐱", "#fff1d8"],
+  ["rana", "Rana agil", "🐸", "#e1f8db"],
+  ["mono", "Mono facilitador", "🐵", "#f8ead8"],
+  ["zorro", "Zorro service", "🦊", "#ffe8d8"],
+  ["ballena", "Ballena azul", "🐳", "#dff5ff"]
+];
+
+const sampleNames = ["Ana", "Luis", "Mafe", "Carlos", "Sofi", "Juli", "Diana", "Mateo"];
+const defaultQuestion = "Del 1 al 10, ¿como calificas esta experiencia?";
+
+let appState = {
+  view: "welcome",
+  code: "",
+  user: loadActiveUser(),
+  hostMode: false,
+  dark: false
+};
+
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function sessionCode() {
+  return Math.random().toString(36).slice(2, 6).toUpperCase();
+}
+
+function readLocalSessions() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function loadSessions() {
+  return sessionCache;
+}
+
+function saveLocalSessions(sessions) {
+  sessionCache = sessions;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  broadcast?.postMessage({ type: "sessions:update" });
+  window.dispatchEvent(new Event("retox:update"));
+}
+
+async function loadRemoteSessions() {
+  if (!supabaseClient) return false;
+  const { data, error } = await supabaseClient.from(SUPABASE_TABLE).select("code,data");
+  if (error) {
+    console.warn("Supabase no esta listo, usando almacenamiento local:", error.message);
+    return false;
+  }
+  sessionCache = Object.fromEntries((data || []).map((row) => [row.code, row.data]));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionCache));
+  remoteReady = true;
+  return true;
+}
+
+async function fetchRemoteSession(code) {
+  if (!supabaseClient) return null;
+  const { data, error } = await supabaseClient.from(SUPABASE_TABLE).select("code,data").eq("code", code).maybeSingle();
+  if (error) {
+    console.warn("No pude consultar Supabase:", error.message);
+    return null;
+  }
+  if (!data) return null;
+  sessionCache = { ...sessionCache, [data.code]: data.data };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionCache));
+  return data.data;
+}
+
+async function persistSession(session) {
+  const sessions = { ...sessionCache, [session.code]: session };
+  sessionCache = sessions;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  broadcast?.postMessage({ type: "sessions:update" });
+
+  if (supabaseClient) {
+    const { error } = await supabaseClient
+      .from(SUPABASE_TABLE)
+      .upsert({ code: session.code, data: session, updated_at: new Date().toISOString() }, { onConflict: "code" });
+    if (error) {
+      remoteReady = false;
+      console.warn("No pude guardar en Supabase, mantengo copia local:", error.message);
+      toast("Supabase no esta listo. Revisa la tabla retox_sessions.");
+    } else {
+      remoteReady = true;
+    }
+  }
+
+  window.dispatchEvent(new Event("retox:update"));
+}
+
+function subscribeToRemoteSessions() {
+  if (!supabaseClient || realtimeChannel) return;
+  realtimeChannel = supabaseClient
+    .channel("retox-sessions")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: SUPABASE_TABLE },
+      (payload) => {
+        const row = payload.new || payload.old;
+        if (!row?.code) return;
+        if (payload.eventType === "DELETE") {
+          const { [row.code]: _removed, ...rest } = sessionCache;
+          sessionCache = rest;
+        } else {
+          sessionCache = { ...sessionCache, [row.code]: row.data };
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionCache));
+        render();
+      }
+    )
+    .subscribe();
+}
+
+function loadActiveUser() {
+  try {
+    return JSON.parse(localStorage.getItem(ACTIVE_USER_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function saveActiveUser(user) {
+  localStorage.setItem(ACTIVE_USER_KEY, JSON.stringify(user));
+}
+
+function getSession(code = appState.code) {
+  return loadSessions()[code];
+}
+
+async function upsertSession(code, updater) {
+  const current = await fetchRemoteSession(code) || getSession(code);
+  if (!current) return;
+  await persistSession(updater(current));
+}
+
+async function createSession() {
+  const code = sessionCode();
+  const now = Date.now();
+  const session = {
+    code,
+    createdAt: now,
+    question: defaultQuestion,
+    participants: {},
+    votes: {},
+    history: [],
+    round: 1
+  };
+  await persistSession(session);
+  appState = { ...appState, view: "host", hostMode: true, code };
+  render();
+}
+
+async function joinSession(code) {
+  const normalized = String(code || "").trim().toUpperCase();
+  if (!normalized) {
+    toast("Ingresa el codigo de la sesion.");
+    return;
+  }
+  const session = getSession(normalized) || await fetchRemoteSession(normalized);
+  if (!session) {
+    toast("No encuentro esa sesion. Revisa el codigo.");
+    return;
+  }
+  appState = { ...appState, code: normalized, view: appState.user ? "waiting" : "identify", hostMode: false };
+  if (appState.user) await addParticipant(normalized, appState.user);
+  render();
+}
+
+async function addParticipant(code, user) {
+  await upsertSession(code, (session) => ({
+    ...session,
+    participants: {
+      ...session.participants,
+      [user.id]: { ...user, joinedAt: session.participants[user.id]?.joinedAt || Date.now() }
+    }
+  }));
+}
+
+async function submitIdentity(event) {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const name = String(form.get("name") || "").trim();
+  const avatar = String(form.get("avatar") || avatars[0][0]);
+  if (!name) {
+    toast("Escribe tu nombre para entrar.");
+    return;
+  }
+  const user = { id: appState.user?.id || uid(), name, avatar };
+  appState.user = user;
+  saveActiveUser(user);
+  await addParticipant(appState.code, user);
+  appState.view = "waiting";
+  render();
+}
+
+async function vote(value) {
+  if (!appState.user) return;
+  await upsertSession(appState.code, (session) => ({
+    ...session,
+    votes: {
+      ...session.votes,
+      [appState.user.id]: { value, at: Date.now(), round: session.round }
+    }
+  }));
+  toast(`Voto enviado: ${value}`);
+  render();
+}
+
+async function resetVotes() {
+  await upsertSession(appState.code, (session) => {
+    const stats = computeStats(session);
+    const history = stats.count
+      ? [{ question: session.question, average: stats.average, count: stats.count, at: Date.now() }, ...session.history].slice(0, 8)
+      : session.history;
+    return { ...session, votes: {}, history, round: session.round + 1 };
+  });
+}
+
+async function updateQuestion(event) {
+  event.preventDefault();
+  const question = new FormData(event.target).get("question").trim();
+  if (!question) return;
+  await upsertSession(appState.code, (session) => ({ ...session, question }));
+  toast("Pregunta actualizada.");
+}
+
+async function addDemoVotes() {
+  await upsertSession(appState.code, (session) => {
+    const participants = { ...session.participants };
+    const votes = { ...session.votes };
+    sampleNames.forEach((name, index) => {
+      const id = `demo-${index}`;
+      participants[id] ||= { id, name, avatar: avatars[(index + 3) % avatars.length][0], joinedAt: Date.now() };
+      votes[id] = { value: Math.ceil(Math.random() * 10), at: Date.now(), round: session.round };
+    });
+    return { ...session, participants, votes };
+  });
+}
+
+function exportResults() {
+  const session = getSession(appState.code);
+  if (!session) return;
+  const stats = computeStats(session);
+  const participants = Object.values(session.participants);
+  const rows = participants.map((participant) => {
+    const avatar = avatarById(participant.avatar);
+    const vote = session.votes[participant.id];
+    return [
+      participant.name,
+      avatar[1],
+      vote?.value ?? "",
+      vote?.at ? new Date(vote.at).toLocaleString("es-CO") : "",
+      session.question,
+      session.code,
+      session.round
+    ];
+  });
+  const distributionRows = stats.distribution.map((count, index) => [index + 1, count]);
+  const html = excelWorkbook([
+    {
+      name: "Votos",
+      rows: [
+        ["Retox - Resultados de encuesta"],
+        ["Vicepresidencia Experiencia Usuario Cliente - Grupo EPM"],
+        ["Codigo", session.code],
+        ["Pregunta", session.question],
+        ["Promedio", stats.count ? stats.average.toFixed(2) : ""],
+        ["Participantes", participants.length],
+        ["Votos", stats.count],
+        [],
+        ["Nombre", "Avatar", "Voto", "Fecha voto", "Pregunta", "Codigo sesion", "Ronda"],
+        ...rows
+      ]
+    },
+    {
+      name: "Distribucion",
+      rows: [["Valor", "Cantidad"], ...distributionRows]
+    },
+    {
+      name: "Historial",
+      rows: [
+        ["Pregunta", "Promedio", "Votos", "Fecha"],
+        ...session.history.map((item) => [
+          item.question,
+          item.average.toFixed(2),
+          item.count,
+          new Date(item.at).toLocaleString("es-CO")
+        ])
+      ]
+    }
+  ]);
+  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `retox-resultados-${session.code}.xls`;
+  document.body.appendChild(link);
+  link.click();
+  URL.revokeObjectURL(link.href);
+  link.remove();
+  toast("Excel exportado.");
+}
+
+function excelWorkbook(sheets) {
+  const sheetHtml = sheets
+    .map(
+      (sheet) => `
+        <h2>${escapeHtml(sheet.name)}</h2>
+        <table border="1">
+          ${sheet.rows
+            .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell ?? "")}</td>`).join("")}</tr>`)
+            .join("")}
+        </table>
+      `
+    )
+    .join("<br/>");
+  return `
+    <html>
+      <head><meta charset="UTF-8" /></head>
+      <body>${sheetHtml}</body>
+    </html>
+  `;
+}
+
+function computeStats(session) {
+  const values = Object.values(session?.votes || {}).map((vote) => Number(vote.value));
+  const count = values.length;
+  const average = count ? values.reduce((sum, value) => sum + value, 0) / count : 0;
+  const distribution = Array.from({ length: 10 }, (_, index) => values.filter((value) => value === index + 1).length);
+  return { average, count, distribution, max: Math.max(1, ...distribution) };
+}
+
+function avatarById(id) {
+  return avatars.find(([avatarId]) => avatarId === id) || avatars[0];
+}
+
+function personChip(person, extra = "") {
+  const [, label, icon, color] = avatarById(person.avatar);
+  return `
+    <div class="person-chip ${extra}" style="--avatar-bg:${color}" title="${escapeHtml(label)}">
+      <span class="person-avatar" aria-hidden="true">${icon}</span>
+      <span class="person-name">${escapeHtml(person.name)}</span>
+    </div>
+  `;
+}
+
+function votedPeople(session) {
+  return Object.entries(session.votes)
+    .map(([userId, vote]) => ({ ...session.participants[userId], vote }))
+    .filter((person) => person.id)
+    .sort((a, b) => b.vote.at - a.vote.at);
+}
+
+function logo() {
+  return `
+    <div class="brand-mark" aria-label="Grupo EPM">
+      <img class="epm-logo" src="./assets/logo-grupo-epm.png" alt="Grupo EPM" />
+      <div>
+        <strong>Retox</strong>
+        <small>Vicepresidencia Experiencia Usuario Cliente</small>
+      </div>
+    </div>
+  `;
+}
+
+function welcomeView() {
+  return `
+    <main class="shell welcome-shell">
+      <section class="hero">
+        <div class="topbar">
+          ${logo()}
+          <button class="icon-button" data-action="toggleDark" aria-label="Cambiar tema">◐</button>
+        </div>
+        <div class="hero-copy">
+          <p class="eyebrow">Vicepresidencia Experiencia Usuario Cliente</p>
+          <h1>Retox</h1>
+          <p>Votaciones en vivo, agiles y visuales para activar conversaciones con usuarios, empleados y clientes.</p>
+        </div>
+        <div class="join-card">
+          <button class="primary" data-action="createSession">Crear sesion host</button>
+          <form data-action="joinForm" class="code-form">
+            <label for="code">Entrar con codigo</label>
+            <div>
+              <input id="code" name="code" maxlength="4" placeholder="EPM1" autocomplete="off" />
+              <button class="secondary" type="submit">Unirme</button>
+            </div>
+          </form>
+        </div>
+      </section>
+      ${footer()}
+    </main>
+  `;
+}
+
+function identifyView() {
+  const selectedAvatar = appState.user?.avatar || avatars[0][0];
+  return `
+    <main class="shell">
+      <section class="panel identity-panel">
+        ${logo()}
+        <p class="eyebrow">Sesion ${appState.code}</p>
+        <h1>Elige tu identidad</h1>
+        <form data-action="identityForm">
+          <label for="name">Nombre visible</label>
+          <input id="name" name="name" maxlength="24" placeholder="Tu nombre" value="${appState.user?.name || ""}" />
+          <fieldset>
+            <legend>Avatar</legend>
+            <div class="avatar-grid">
+              ${avatars
+                .map(([id, label, icon, color]) => avatarOption(id, label, icon, color, id === selectedAvatar))
+                .join("")}
+            </div>
+          </fieldset>
+          <button class="primary full" type="submit">Entrar en 5 segundos</button>
+        </form>
+      </section>
+      ${footer()}
+    </main>
+  `;
+}
+
+function avatarOption(id, label, icon, color, checked) {
+  return `
+    <label class="avatar-option" style="--avatar-bg:${color}">
+      <input type="radio" name="avatar" value="${id}" ${checked ? "checked" : ""} />
+      <span>${icon}</span>
+      <small>${label}</small>
+    </label>
+  `;
+}
+
+function waitingView(session) {
+  const stats = computeStats(session);
+  const voted = Boolean(session.votes[appState.user?.id]);
+  return `
+    <main class="app-grid">
+      ${roomHeader(session)}
+      <section class="participant-strip">
+        ${personChip(appState.user, "active-person")}
+        <button class="icon-button edit-person" data-action="editIdentity" aria-label="Cambiar nombre o avatar" title="Cambiar nombre o avatar">✎</button>
+      </section>
+      <section class="panel question-panel">
+        <p class="eyebrow">Ronda ${session.round}</p>
+        <h1>${escapeHtml(session.question)}</h1>
+        <p>${Object.keys(session.participants).length} participantes conectados</p>
+      </section>
+      <section class="vote-board">
+        ${Array.from({ length: 10 }, (_, index) => {
+          const value = index + 1;
+          return `<button class="vote-tile ${voted && session.votes[appState.user.id].value === value ? "selected" : ""}" data-vote="${value}">${value}</button>`;
+        }).join("")}
+      </section>
+      <section class="panel compact">
+        <strong>${voted ? "Tu voto quedo registrado" : "Selecciona un valor de 1 a 10"}</strong>
+        <div class="mini-result">
+          ${thermometer(stats.average)}
+          ${histogram(stats)}
+        </div>
+      </section>
+      ${footer()}
+    </main>
+  `;
+}
+
+function hostView(session) {
+  const stats = computeStats(session);
+  const link = `${location.href.split("#")[0]}#join=${session.code}`;
+  const people = votedPeople(session);
+  return `
+    <main class="host-layout">
+      ${roomHeader(session)}
+      <section class="host-main">
+        <div class="results-stage">
+          <h2 class="live-question">${escapeHtml(session.question)}</h2>
+          <div>
+            <p class="eyebrow">Promedio en vivo</p>
+            <h1>${stats.count ? stats.average.toFixed(1) : "--"}</h1>
+            <p>${stats.count} votos de ${Object.keys(session.participants).length} participantes</p>
+          </div>
+          ${thermometer(stats.average, true)}
+          <div class="live-voters" aria-live="polite">
+            ${
+              people.length
+                ? people.map((person) => personChip(person)).join("")
+                : `<p class="waiting-votes">Aun no hay votos registrados</p>`
+            }
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Distribucion</h2>
+          ${histogram(stats)}
+        </div>
+      </section>
+      <aside class="host-side">
+        <section class="panel">
+          <p class="eyebrow">Codigo de sala</p>
+          <div class="room-code">${session.code}</div>
+          <input class="share-link" readonly value="${link}" aria-label="Link de invitacion" />
+        </section>
+        <section class="panel">
+          <form data-action="questionForm">
+            <label for="question">Pregunta activa</label>
+            <textarea id="question" name="question" rows="3">${escapeHtml(session.question)}</textarea>
+            <button class="secondary full" type="submit">Cambiar pregunta</button>
+          </form>
+          <div class="host-actions">
+            <button data-action="resetVotes">Resetear votaciones</button>
+            <button data-action="addDemoVotes">Demo votos</button>
+            <button class="export-button" data-action="exportResults">Exportar Excel</button>
+          </div>
+        </section>
+        <section class="panel">
+          <h2>Historial</h2>
+          <div class="history">
+            ${
+              session.history.length
+                ? session.history
+                    .map((item) => `<div><strong>${item.average.toFixed(1)}</strong><span>${item.count} votos</span><small>${escapeHtml(item.question)}</small></div>`)
+                    .join("")
+                : `<p class="muted">Cada reset guarda el promedio de la ronda.</p>`
+            }
+          </div>
+        </section>
+      </aside>
+    </main>
+  `;
+}
+
+function roomHeader(session) {
+  return `
+    <header class="room-header">
+      ${logo()}
+      <div class="room-meta">
+        <span>${session.code}</span>
+        <button class="icon-button" data-action="home" aria-label="Inicio">⌂</button>
+      </div>
+    </header>
+  `;
+}
+
+function thermometer(value, large = false) {
+  const percent = Math.max(0, Math.min(100, ((value || 0) - 1) / 9 * 100));
+  return `
+    <div class="thermo ${large ? "large" : ""}" style="--level:${percent}%">
+      <div class="thermo-scale"><span>10</span><span>5</span><span>1</span></div>
+      <div class="thermo-track"><div class="thermo-fill"></div></div>
+      <div class="thermo-value">${value ? value.toFixed(1) : "--"}</div>
+    </div>
+  `;
+}
+
+function histogram(stats) {
+  return `
+    <div class="histogram">
+      ${stats.distribution
+        .map((count, index) => `<div class="bar-wrap"><span style="height:${(count / stats.max) * 100}%"></span><small>${index + 1}</small></div>`)
+        .join("")}
+    </div>
+  `;
+}
+
+function footer() {
+  return `<footer>Vicepresidencia Experiencia Usuario Cliente - Grupo EPM</footer>`;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  })[char]);
+}
+
+function toast(message) {
+  const node = document.createElement("div");
+  node.className = "toast";
+  node.textContent = message;
+  document.body.appendChild(node);
+  setTimeout(() => node.remove(), 2200);
+}
+
+function render() {
+  const root = document.querySelector("#app");
+  document.body.classList.toggle("dark", appState.dark);
+  const hashJoin = location.hash.match(/join=([A-Z0-9]{4})/i);
+  if (hashJoin && appState.view === "welcome") {
+    const linkedCode = hashJoin[1].toUpperCase();
+    if (getSession(linkedCode)) {
+      appState.code = linkedCode;
+      appState.view = appState.user ? "waiting" : "identify";
+      if (appState.user) addParticipant(linkedCode, appState.user);
+    } else {
+      appState.code = linkedCode;
+    }
+  }
+
+  const session = appState.code ? getSession(appState.code) : null;
+  if (appState.view !== "welcome" && !session) appState.view = "welcome";
+
+  root.innerHTML =
+    appState.view === "welcome"
+      ? welcomeView()
+      : appState.view === "identify"
+        ? identifyView()
+        : appState.view === "host"
+          ? hostView(session)
+          : waitingView(session);
+
+  if (hashJoin && appState.view === "welcome") {
+    const input = document.querySelector("#code");
+    if (input) input.value = appState.code;
+  }
+}
+
+document.addEventListener("click", async (event) => {
+  const action = event.target.closest("[data-action]")?.dataset.action;
+  const voteValue = event.target.closest("[data-vote]")?.dataset.vote;
+  if (voteValue) await vote(Number(voteValue));
+  if (action === "createSession") await createSession();
+  if (action === "resetVotes") await resetVotes();
+  if (action === "addDemoVotes") await addDemoVotes();
+  if (action === "exportResults") exportResults();
+  if (action === "editIdentity") {
+    appState.view = "identify";
+    render();
+  }
+  if (action === "home") {
+    appState = { ...appState, view: "welcome", code: "", hostMode: false };
+    history.replaceState(null, "", location.pathname);
+    render();
+  }
+  if (action === "toggleDark") {
+    appState.dark = !appState.dark;
+    render();
+  }
+});
+
+document.addEventListener("submit", async (event) => {
+  const action = event.target.dataset.action;
+  if (!action) return;
+  event.preventDefault();
+  if (action === "joinForm") await joinSession(new FormData(event.target).get("code"));
+  if (action === "identityForm") await submitIdentity(event);
+  if (action === "questionForm") await updateQuestion(event);
+});
+
+window.addEventListener("retox:update", render);
+broadcast?.addEventListener("message", () => {
+  sessionCache = readLocalSessions();
+  render();
+});
+window.addEventListener("storage", () => {
+  sessionCache = readLocalSessions();
+  render();
+});
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js").catch(() => {});
+}
+
+async function initApp() {
+  await loadRemoteSessions();
+  subscribeToRemoteSessions();
+  render();
+}
+
+initApp();

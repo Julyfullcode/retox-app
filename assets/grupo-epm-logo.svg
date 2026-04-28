@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 908 184" role="img" aria-label="Grupo EPM">
+  <rect width="908" height="184" fill="none"/>
+  <g font-family="Arial, Helvetica, sans-serif" font-weight="700">
+    <text x="0" y="128" fill="#8a8c8e" font-size="148">Grupo</text>
+    <circle cx="535" cy="114" r="27" fill="#d9d9d9"/>
+    <text x="579" y="128" fill="#00843d" font-size="150">ep</text>
+  </g>
+  <path fill="#78be20" d="M783 128V78c0-33 22-56 54-56 22 0 40 10 50 27 11-17 29-27 51-27 33 0 55 23 55 56v50c0 16-11 27-27 27s-27-11-27-27V82c0-13-8-22-21-22-14 0-22 9-22 22v46c0 16-11 27-27 27s-27-11-27-27V82c0-13-8-22-21-22s-22 9-22 22v46c0 16-11 27-27 27s-27-11-27-27Z"/>
+</svg>

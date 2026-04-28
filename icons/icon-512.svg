@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Retox">
+  <rect width="512" height="512" rx="112" fill="#0b8f48"/>
+  <circle cx="388" cy="130" r="64" fill="#b6e23a"/>
+  <path d="M110 352V144h162c59 0 99 37 99 88 0 38-22 67-56 80l72 40H282l-58-34h-31v34h-83Zm83-98h72c17 0 28-10 28-24 0-15-11-24-28-24h-72v48Z" fill="#fff"/>
+  <path d="M112 402h282" stroke="#1f6fb2" stroke-width="32" stroke-linecap="round"/>
+</svg>
