@@ -66,8 +66,9 @@ button {
 .hero {
   min-height: calc(100vh - 80px);
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 28px;
+  grid-template-rows: auto auto auto;
+  align-content: center;
+  gap: 22px;
   padding: 16px;
   border-radius: 0 0 8px 8px;
 }
@@ -111,9 +112,10 @@ button {
 }
 
 .hero-copy {
-  align-self: end;
+  justify-self: center;
   max-width: 720px;
   padding-bottom: 12px;
+  text-align: center;
 }
 
 .eyebrow {
@@ -148,12 +150,33 @@ h2 {
   line-height: 1.55;
 }
 
+.entry-card,
+.code-form,
 .join-card,
 .panel {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: color-mix(in srgb, var(--card) 92%, transparent);
   box-shadow: var(--shadow);
+}
+
+.entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 14px;
+  justify-self: center;
+  width: min(720px, 100%);
+  padding: 14px;
+}
+
+.entry-card,
+.code-form {
+  padding: 16px;
+}
+
+.entry-card h2,
+.code-form h2 {
+  margin-bottom: 12px;
 }
 
 .join-card {
@@ -163,13 +186,15 @@ h2 {
 }
 
 .code-form,
-.admin-form {
+.admin-form,
+.entry-card {
   display: grid;
   gap: 8px;
 }
 
 .code-form div,
-.admin-form div {
+.admin-form div,
+.inline-form {
   display: grid;
   grid-template-columns: minmax(112px, 150px) auto;
   gap: 10px;
@@ -231,6 +256,18 @@ textarea:focus {
   background: var(--card);
   color: var(--ink);
   border: 1px solid var(--line);
+}
+
+.home-button {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border: 2px solid rgba(31, 111, 178, 0.24);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #b6e23a, #0b8f48 48%, #1f6fb2);
+  box-shadow: 0 14px 30px rgba(11, 143, 72, 0.22);
+  font-size: 1.8rem;
 }
 
 .identity-panel {
@@ -417,6 +454,12 @@ fieldset {
   color: #fff;
 }
 
+.vote-tile:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
+
 .mini-result {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -568,6 +611,33 @@ fieldset {
   text-align: center;
 }
 
+.countdown {
+  grid-column: 1 / -1;
+  justify-self: center;
+  display: inline-grid;
+  justify-items: center;
+  gap: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.13);
+  padding: 8px 18px;
+}
+
+.countdown span {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.countdown strong {
+  color: #fff;
+  font-size: clamp(1.4rem, 4vw, 2.4rem);
+}
+
+.countdown.closed {
+  background: rgba(217, 45, 32, 0.22);
+}
+
 .results-stage .eyebrow,
 .results-stage p {
   color: rgba(255, 255, 255, 0.84);
@@ -669,6 +739,24 @@ footer {
   padding: 20px;
 }
 
+.host-portal {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.setup-panel {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+}
+
+.setup-panel h1 {
+  margin-bottom: 4px;
+  font-size: clamp(2rem, 5vw, 3.6rem);
+}
+
 .admin-head {
   display: flex;
   align-items: start;
@@ -728,11 +816,6 @@ footer {
 }
 
 @media (min-width: 760px) {
-  .join-card {
-    grid-template-columns: 260px 1fr;
-    align-items: end;
-  }
-
   .avatar-grid {
     grid-template-columns: repeat(5, 1fr);
   }
@@ -754,8 +837,14 @@ footer {
     grid-template-columns: 1fr;
   }
 
+  .entry-grid,
+  .host-portal {
+    grid-template-columns: 1fr;
+  }
+
   .code-form div,
-  .admin-form div {
+  .admin-form div,
+  .inline-form {
     grid-template-columns: minmax(104px, 132px) auto;
   }
 

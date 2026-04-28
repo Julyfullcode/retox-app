@@ -163,13 +163,16 @@ async function upsertSession(code, updater) {
   await persistSession(updater(current));
 }
 
-async function createSession() {
+async function createSession(options = {}) {
   const code = sessionCode();
   const now = Date.now();
+  const durationMinutes = Math.max(1, Number(options.durationMinutes || 10));
   const session = {
     code,
     createdAt: now,
-    question: defaultQuestion,
+    question: String(options.question || defaultQuestion).trim() || defaultQuestion,
+    durationMinutes,
+    expiresAt: now + durationMinutes * 60 * 1000,
     participants: {},
     votes: {},
     history: [],
@@ -225,6 +228,12 @@ async function submitIdentity(event) {
 
 async function vote(value) {
   if (!appState.user) return;
+  const current = await fetchRemoteSession(appState.code) || getSession(appState.code);
+  if (isSessionClosed(current)) {
+    toast("La votacion ya esta cerrada.");
+    render();
+    return;
+  }
   await upsertSession(appState.code, (session) => ({
     ...session,
     votes: {
@@ -242,7 +251,8 @@ async function resetVotes() {
     const history = stats.count
       ? [{ question: session.question, average: stats.average, count: stats.count, at: Date.now() }, ...session.history].slice(0, 8)
       : session.history;
-    return { ...session, votes: {}, history, round: session.round + 1 };
+    const now = Date.now();
+    return { ...session, votes: {}, history, round: session.round + 1, expiresAt: now + (session.durationMinutes || 10) * 60 * 1000 };
   });
 }
 
@@ -374,6 +384,21 @@ function computeStats(session) {
   return { average, count, distribution, max: Math.max(1, ...distribution) };
 }
 
+function remainingMs(session) {
+  return Math.max(0, Number(session?.expiresAt || 0) - Date.now());
+}
+
+function isSessionClosed(session) {
+  return Boolean(session?.expiresAt && remainingMs(session) <= 0);
+}
+
+function formatRemaining(session) {
+  const totalSeconds = Math.ceil(remainingMs(session) / 1000);
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
 function avatarById(id) {
   return avatars.find(([avatarId]) => avatarId === id) || avatars[0];
 }
@@ -420,20 +445,21 @@ function welcomeView() {
           <h1>Retox</h1>
           <p>Votaciones en vivo, agiles y visuales para activar conversaciones con usuarios, empleados y clientes.</p>
         </div>
-        <div class="join-card">
-          <button class="primary" data-action="createSession">Crear sesion host</button>
-          <form data-action="joinForm" class="code-form">
-            <label for="code">Entrar con codigo</label>
-            <div>
-              <input id="code" name="code" maxlength="4" placeholder="EPM1" autocomplete="off" />
-              <button class="secondary" type="submit">Unirme</button>
+        <div class="entry-grid">
+          <form data-action="hostAccessForm" class="entry-card">
+            <h2>Entrar como host</h2>
+            <label for="host-password">Contraseña</label>
+            <div class="inline-form">
+              <input id="host-password" name="hostPassword" type="password" placeholder="Experiencia" autocomplete="current-password" />
+              <button class="primary" type="submit">Entrar</button>
             </div>
           </form>
-          <form data-action="adminForm" class="admin-form">
-            <label for="admin-code">Acceso historial</label>
-            <div>
-              <input id="admin-code" name="adminCode" placeholder="Codigo" autocomplete="off" />
-              <button class="secondary" type="submit">Entrar</button>
+          <form data-action="joinForm" class="code-form">
+            <h2>Entrar como invitado</h2>
+            <label for="code">Entrar con codigo</label>
+            <div class="inline-form">
+              <input id="code" name="code" maxlength="4" placeholder="EPM1" autocomplete="off" />
+              <button class="secondary" type="submit">Unirme</button>
             </div>
           </form>
         </div>
@@ -443,18 +469,36 @@ function welcomeView() {
   `;
 }
 
-function adminView() {
-  const sessions = Object.values(loadSessions()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+function hostSetupView() {
   return `
     <main class="admin-layout">
-      ${roomHeader({ code: "Historial" })}
+      ${roomHeader({ code: "Host" })}
+      <section class="host-portal">
+        <form class="panel setup-panel" data-action="createSessionForm">
+          <p class="eyebrow">Crear sesion</p>
+          <h1>Nueva encuesta</h1>
+          <label for="setup-question">Pregunta</label>
+          <textarea id="setup-question" name="question" rows="3">${defaultQuestion}</textarea>
+          <label for="setup-duration">Tiempo maximo de vigencia en minutos</label>
+          <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
+          <button class="primary full" type="submit">Crear sesion</button>
+        </form>
+        ${adminHistoryPanel()}
+      </section>
+      ${footer()}
+    </main>
+  `;
+}
+
+function adminHistoryPanel() {
+  const sessions = Object.values(loadSessions()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  return `
       <section class="panel admin-panel">
         <div class="admin-head">
           <div>
             <p class="eyebrow">Historial de encuestas</p>
             <h1>Resultados Retox</h1>
           </div>
-          <button class="secondary" data-action="home">Volver</button>
         </div>
         ${
           sessions.length
@@ -472,9 +516,11 @@ function adminView() {
             : `<p class="muted">Todavia no hay encuestas guardadas.</p>`
         }
       </section>
-      ${footer()}
-    </main>
   `;
+}
+
+function adminView() {
+  return hostSetupView();
 }
 
 function adminSessionRow(session) {
@@ -496,12 +542,12 @@ function adminSessionRow(session) {
 }
 
 function enterAdmin(code) {
-  if (String(code || "").trim() !== "Premio123") {
-    toast("Codigo de historial incorrecto.");
+  if (String(code || "").trim() !== "Experiencia") {
+    toast("Contraseña de host incorrecta.");
     return;
   }
-  appState = { ...appState, view: "admin", code: "", hostMode: false };
-  history.replaceState(null, "", `${location.pathname}#admin`);
+  appState = { ...appState, view: "hostSetup", code: "", hostMode: true };
+  history.replaceState(null, "", appBaseUrl());
   render();
 }
 
@@ -545,6 +591,7 @@ function avatarOption(id, label, icon, color, checked) {
 function waitingView(session) {
   const stats = computeStats(session);
   const voted = Boolean(session.votes[appState.user?.id]);
+  const closed = isSessionClosed(session);
   return `
     <main class="app-grid">
       ${roomHeader(session)}
@@ -555,16 +602,16 @@ function waitingView(session) {
       <section class="panel question-panel">
         <p class="eyebrow">Ronda ${session.round}</p>
         <h1>${escapeHtml(session.question)}</h1>
-        <p>${Object.keys(session.participants).length} participantes conectados</p>
+        <p>${closed ? "Votacion cerrada" : `Tiempo restante ${formatRemaining(session)}`} · ${Object.keys(session.participants).length} participantes conectados</p>
       </section>
       <section class="vote-board">
         ${Array.from({ length: 10 }, (_, index) => {
           const value = index + 1;
-          return `<button class="vote-tile ${voted && session.votes[appState.user.id].value === value ? "selected" : ""}" data-vote="${value}">${value}</button>`;
+          return `<button class="vote-tile ${voted && session.votes[appState.user.id].value === value ? "selected" : ""}" data-vote="${value}" ${closed ? "disabled" : ""}>${value}</button>`;
         }).join("")}
       </section>
       <section class="panel compact">
-        <strong>${voted ? "Tu voto quedo registrado" : "Selecciona un valor de 1 a 10"}</strong>
+        <strong>${closed ? "La votacion ya no acepta respuestas" : voted ? "Tu voto quedo registrado" : "Selecciona un valor de 1 a 10"}</strong>
         <div class="mini-result">
           ${thermometer(stats.average)}
           ${histogram(stats)}
@@ -585,6 +632,10 @@ function hostView(session) {
       <section class="host-main">
         <div class="results-stage">
           <h2 class="live-question">${escapeHtml(session.question)}</h2>
+          <div class="countdown ${isSessionClosed(session) ? "closed" : ""}">
+            <span>${isSessionClosed(session) ? "Votacion cerrada" : "Tiempo restante"}</span>
+            <strong>${formatRemaining(session)}</strong>
+          </div>
           <div>
             <p class="eyebrow">Promedio en vivo</p>
             <h1>${stats.count ? stats.average.toFixed(1) : "--"}</h1>
@@ -645,7 +696,7 @@ function roomHeader(session) {
       ${logo()}
       <div class="room-meta">
         <span>${session.code}</span>
-        <button class="icon-button" data-action="home" aria-label="Inicio">⌂</button>
+        <button class="home-button" data-action="home" aria-label="Inicio" title="Inicio">🏠</button>
       </div>
     </header>
   `;
@@ -721,12 +772,12 @@ function render() {
   }
 
   const session = appState.code ? getSession(appState.code) : null;
-  if (!["welcome", "admin"].includes(appState.view) && !session) appState.view = "welcome";
+  if (!["welcome", "admin", "hostSetup"].includes(appState.view) && !session) appState.view = "welcome";
 
   root.innerHTML =
     appState.view === "welcome"
       ? welcomeView()
-      : appState.view === "admin"
+      : appState.view === "admin" || appState.view === "hostSetup"
         ? adminView()
         : appState.view === "identify"
           ? identifyView()
@@ -746,7 +797,6 @@ document.addEventListener("click", async (event) => {
   const exportCode = event.target.closest("[data-export-code]")?.dataset.exportCode;
   if (voteValue) await vote(Number(voteValue));
   if (exportCode) exportSessionResults(getSession(exportCode));
-  if (action === "createSession") await createSession();
   if (action === "resetVotes") await resetVotes();
   if (action === "addDemoVotes") await addDemoVotes();
   if (action === "exportResults") exportResults();
@@ -773,6 +823,13 @@ document.addEventListener("submit", async (event) => {
   if (action === "adminForm") enterAdmin(new FormData(event.target).get("adminCode"));
   if (action === "identityForm") await submitIdentity(event);
   if (action === "questionForm") await updateQuestion(event);
+  if (action === "hostAccessForm") enterAdmin(new FormData(event.target).get("hostPassword"));
+  if (action === "createSessionForm") {
+    await createSession({
+      question: new FormData(event.target).get("question"),
+      durationMinutes: new FormData(event.target).get("durationMinutes")
+    });
+  }
 });
 
 window.addEventListener("retox:update", render);
@@ -796,3 +853,7 @@ async function initApp() {
 }
 
 initApp();
+
+setInterval(() => {
+  if (["host", "waiting"].includes(appState.view)) render();
+}, 1000);
