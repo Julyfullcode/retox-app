@@ -437,15 +437,24 @@ function logo() {
   `;
 }
 
+function homeBrand() {
+  return `
+    <div class="home-brand">
+      <img class="home-epm-logo" src="./assets/logo-grupo-epm.png" alt="Grupo EPM" />
+      <p>Vicepresidencia Experiencia Usuario Cliente</p>
+    </div>
+  `;
+}
+
 function welcomeView() {
   return `
     <main class="shell welcome-shell">
       <section class="hero">
         <div class="topbar">
-          ${logo()}
           <button class="icon-button" data-action="toggleDark" aria-label="Cambiar tema">◐</button>
         </div>
         <div class="hero-copy">
+          ${homeBrand()}
           <h1>Retox</h1>
           <p>Opina, participa y ve resultados en tiempo real. Así funciona Retox.</p>
         </div>

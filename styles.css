@@ -81,6 +81,10 @@ button {
   gap: 14px;
 }
 
+.topbar {
+  justify-content: end;
+}
+
 .brand-mark {
   display: grid;
   grid-template-columns: 220px minmax(0, auto);
@@ -114,8 +118,28 @@ button {
 .hero-copy {
   justify-self: center;
   max-width: 720px;
-  padding-bottom: 12px;
+  padding-bottom: 2px;
   text-align: center;
+}
+
+.home-brand {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.home-epm-logo {
+  display: block;
+  width: min(360px, 82vw);
+  height: auto;
+}
+
+.home-brand p {
+  margin: 0;
+  color: var(--blue);
+  font-size: clamp(0.9rem, 2.5vw, 1.15rem);
+  font-weight: 800;
 }
 
 .eyebrow {
@@ -764,7 +788,7 @@ footer {
 
 .setup-panel h1 {
   margin-bottom: 4px;
-  font-size: clamp(2rem, 5vw, 3.6rem);
+  font-size: clamp(1.6rem, 3vw, 2.3rem);
 }
 
 .admin-head {
@@ -777,7 +801,7 @@ footer {
 
 .admin-head h1 {
   margin-bottom: 0;
-  font-size: clamp(2rem, 6vw, 4rem);
+  font-size: clamp(1.6rem, 3vw, 2.3rem);
 }
 
 .admin-table {
@@ -788,23 +812,25 @@ footer {
 
 .admin-row {
   display: grid;
-  grid-template-columns: 84px minmax(240px, 1.4fr) 70px 88px 180px 120px;
+  grid-template-columns: 70px minmax(220px, 1.4fr) 56px 72px 154px 104px;
   align-items: center;
-  gap: 10px;
-  min-width: 900px;
+  gap: 8px;
+  min-width: 760px;
   border-bottom: 1px solid var(--line);
-  padding: 10px 0;
+  padding: 8px 0;
+  font-size: 0.84rem;
 }
 
 .admin-row-head {
   color: var(--blue);
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   font-weight: 900;
 }
 
 .admin-links {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .admin-links a {
