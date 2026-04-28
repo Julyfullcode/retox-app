@@ -553,7 +553,7 @@ fieldset {
 }
 
 .large .thermo-value {
-  font-size: 2rem;
+  display: none;
 }
 
 .histogram {
@@ -598,8 +598,20 @@ fieldset {
   gap: 16px;
 }
 
-.host-layout .room-header {
+.host-layout .room-header,
+.host-layout footer {
   grid-column: 1 / -1;
+}
+
+.display-layout {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 18px;
+}
+
+.display-results {
+  display: grid;
+  gap: 16px;
 }
 
 .host-main,
@@ -626,7 +638,7 @@ fieldset {
 .live-question {
   grid-column: 1 / -1;
   max-width: 860px;
-  margin: 0 auto;
+  margin: 0 auto 10px;
   color: #fff;
   font-size: clamp(1.25rem, 2.4vw, 2rem);
   line-height: 1.18;
@@ -664,7 +676,7 @@ fieldset {
 
 .countdown strong {
   color: #fff;
-  font-size: clamp(1.4rem, 4vw, 2.4rem);
+  font-size: clamp(1.9rem, 5vw, 3.4rem);
 }
 
 .countdown.closed {

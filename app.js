@@ -290,7 +290,8 @@ function sessionLinks(code) {
   const base = appBaseUrl();
   return {
     host: `${base}#host=${code}`,
-    participant: `${base}#join=${code}`
+    participant: `${base}#join=${code}`,
+    display: `${base}#display=${code}`
   };
 }
 
@@ -639,35 +640,11 @@ function waitingView(session) {
 function hostView(session) {
   const stats = computeStats(session);
   const links = sessionLinks(session.code);
-  const people = votedPeople(session).slice(-5);
   return `
     <main class="host-layout">
       ${roomHeader(session)}
       <section class="host-main">
-        <div class="results-stage">
-          <h2 class="live-question">${escapeHtml(session.question)}</h2>
-          <div class="live-metrics">
-            <div class="metric-card countdown ${isSessionClosed(session) ? "closed" : ""}">
-              <span>${isSessionClosed(session) ? "Votacion cerrada" : "Tiempo restante"}</span>
-              <strong>${formatRemaining(session)}</strong>
-            </div>
-            <div class="metric-card average-card">
-              <div>
-                <p class="eyebrow">Promedio en vivo</p>
-                <h1>${stats.count ? stats.average.toFixed(1) : "--"}</h1>
-                <p>${stats.count} votos de ${Object.keys(session.participants).length} participantes</p>
-              </div>
-              ${thermometer(stats.average, true)}
-            </div>
-          </div>
-          <div class="live-voters" aria-live="polite">
-            ${
-              people.length
-                ? people.map((person) => personChip(person)).join("")
-                : `<p class="waiting-votes">Aun no hay votos registrados</p>`
-            }
-          </div>
-        </div>
+        ${liveResultsPanel(session)}
         <div class="panel">
           <h2>Distribución respuestas</h2>
           ${histogram(stats)}
@@ -691,6 +668,7 @@ function hostView(session) {
           <div class="host-actions">
             <button data-action="resetVotes">Resetear votaciones</button>
             <button data-action="addDemoVotes">Demo votos</button>
+            <button data-open-display="${links.display}">Abrir resultados</button>
             <button class="export-button" data-action="exportResults">Exportar Excel</button>
           </div>
         </section>
@@ -707,7 +685,55 @@ function hostView(session) {
           </div>
         </section>
       </aside>
+      ${footer()}
     </main>
+  `;
+}
+
+function displayView(session) {
+  return `
+    <main class="display-layout">
+      ${roomHeader(session)}
+      <section class="display-results">
+        ${liveResultsPanel(session)}
+        <div class="panel">
+          <h2>Distribución respuestas</h2>
+          ${histogram(computeStats(session))}
+        </div>
+      </section>
+      ${footer()}
+    </main>
+  `;
+}
+
+function liveResultsPanel(session) {
+  const stats = computeStats(session);
+  const people = votedPeople(session).slice(-5);
+  return `
+    <div class="results-stage">
+      <h2 class="live-question">${escapeHtml(session.question)}</h2>
+      <div class="live-metrics">
+        <div class="metric-card countdown ${isSessionClosed(session) ? "closed" : ""}">
+          <span>${isSessionClosed(session) ? "Votacion cerrada" : "Tiempo restante"}</span>
+          <strong>${formatRemaining(session)}</strong>
+        </div>
+        <div class="metric-card average-card">
+          <div>
+            <p class="eyebrow">Promedio en vivo</p>
+            <h1>${stats.count ? stats.average.toFixed(1) : "--"}</h1>
+            <p>${stats.count} votos de ${Object.keys(session.participants).length} participantes</p>
+          </div>
+          ${thermometer(stats.average, true)}
+        </div>
+      </div>
+      <div class="live-voters" aria-live="polite">
+        ${
+          people.length
+            ? people.map((person) => personChip(person)).join("")
+            : `<p class="waiting-votes">Aun no hay votos registrados</p>`
+        }
+      </div>
+    </div>
   `;
 }
 
@@ -786,6 +812,16 @@ function render() {
   document.body.classList.toggle("dark", appState.dark);
   const hashJoin = location.hash.match(/join=([A-Z0-9]{4})/i);
   const hashHost = location.hash.match(/host=([A-Z0-9]{4})/i);
+  const hashDisplay = location.hash.match(/display=([A-Z0-9]{4})/i);
+  if (hashDisplay && appState.view === "welcome") {
+    const linkedCode = hashDisplay[1].toUpperCase();
+    if (getSession(linkedCode)) {
+      appState.code = linkedCode;
+      appState.view = "display";
+    } else {
+      appState.code = linkedCode;
+    }
+  }
   if (hashHost && appState.view === "welcome") {
     const linkedCode = hashHost[1].toUpperCase();
     if (getSession(linkedCode)) {
@@ -819,7 +855,9 @@ function render() {
           ? identifyView()
           : appState.view === "host"
             ? hostView(session)
-            : waitingView(session);
+            : appState.view === "display"
+              ? displayView(session)
+              : waitingView(session);
 
   if (hashJoin && appState.view === "welcome") {
     const input = document.querySelector("#code");
@@ -832,9 +870,11 @@ document.addEventListener("click", async (event) => {
   const voteValue = event.target.closest("[data-vote]")?.dataset.vote;
   const exportCode = event.target.closest("[data-export-code]")?.dataset.exportCode;
   const copyUrl = event.target.closest("[data-copy-url]")?.dataset.copyUrl;
+  const displayUrl = event.target.closest("[data-open-display]")?.dataset.openDisplay;
   if (voteValue) await vote(Number(voteValue));
   if (exportCode) exportSessionResults(getSession(exportCode));
   if (copyUrl) await copyToClipboard(copyUrl);
+  if (displayUrl) window.open(displayUrl, "_blank", "noopener,noreferrer");
   if (action === "resetVotes") await resetVotes();
   if (action === "addDemoVotes") await addDemoVotes();
   if (action === "exportResults") exportResults();
@@ -893,5 +933,7 @@ async function initApp() {
 initApp();
 
 setInterval(() => {
-  if (["host", "waiting"].includes(appState.view)) render();
+  const focused = document.activeElement;
+  const isEditing = focused && ["INPUT", "TEXTAREA", "SELECT"].includes(focused.tagName);
+  if (!isEditing && ["host", "waiting", "display"].includes(appState.view)) render();
 }, 1000);
