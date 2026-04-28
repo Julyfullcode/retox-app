@@ -646,16 +646,20 @@ function hostView(session) {
       <section class="host-main">
         <div class="results-stage">
           <h2 class="live-question">${escapeHtml(session.question)}</h2>
-          <div class="countdown ${isSessionClosed(session) ? "closed" : ""}">
-            <span>${isSessionClosed(session) ? "Votacion cerrada" : "Tiempo restante"}</span>
-            <strong>${formatRemaining(session)}</strong>
+          <div class="live-metrics">
+            <div class="metric-card countdown ${isSessionClosed(session) ? "closed" : ""}">
+              <span>${isSessionClosed(session) ? "Votacion cerrada" : "Tiempo restante"}</span>
+              <strong>${formatRemaining(session)}</strong>
+            </div>
+            <div class="metric-card average-card">
+              <div>
+                <p class="eyebrow">Promedio en vivo</p>
+                <h1>${stats.count ? stats.average.toFixed(1) : "--"}</h1>
+                <p>${stats.count} votos de ${Object.keys(session.participants).length} participantes</p>
+              </div>
+              ${thermometer(stats.average, true)}
+            </div>
           </div>
-          <div>
-            <p class="eyebrow">Promedio en vivo</p>
-            <h1>${stats.count ? stats.average.toFixed(1) : "--"}</h1>
-            <p>${stats.count} votos de ${Object.keys(session.participants).length} participantes</p>
-          </div>
-          ${thermometer(stats.average, true)}
           <div class="live-voters" aria-live="polite">
             ${
               people.length
@@ -665,7 +669,7 @@ function hostView(session) {
           </div>
         </div>
         <div class="panel">
-          <h2>Distribucion</h2>
+          <h2>Distribución respuestas</h2>
           ${histogram(stats)}
         </div>
       </section>

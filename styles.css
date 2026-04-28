@@ -59,17 +59,17 @@ button {
 .welcome-shell {
   min-height: 100vh;
   display: grid;
-  align-content: space-between;
-  gap: 18px;
+  align-content: center;
+  gap: 8px;
 }
 
 .hero {
-  min-height: calc(100vh - 80px);
+  min-height: calc(100vh - 44px);
   display: grid;
   grid-template-rows: auto auto auto;
   align-content: center;
-  gap: 22px;
-  padding: 16px;
+  gap: 12px;
+  padding: 8px 16px;
   border-radius: 0 0 8px 8px;
 }
 
@@ -118,20 +118,20 @@ button {
 .hero-copy {
   justify-self: center;
   max-width: 720px;
-  padding-bottom: 2px;
+  padding-bottom: 0;
   text-align: center;
 }
 
 .home-brand {
   display: grid;
   justify-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: 4px;
+  margin-bottom: 4px;
 }
 
 .home-epm-logo {
   display: block;
-  width: min(360px, 82vw);
+  width: min(330px, 78vw);
   height: auto;
 }
 
@@ -170,8 +170,8 @@ h2 {
 .hero-copy p:last-child {
   max-width: 560px;
   color: var(--muted);
-  font-size: 1.1rem;
-  line-height: 1.55;
+  font-size: 1rem;
+  line-height: 1.35;
 }
 
 .entry-card,
@@ -187,15 +187,15 @@ h2 {
 .entry-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(260px, 1fr));
-  gap: 14px;
+  gap: 12px;
   justify-self: center;
   width: min(720px, 100%);
-  padding: 14px;
+  padding: 8px 14px 0;
 }
 
 .entry-card,
 .code-form {
-  padding: 16px;
+  padding: 14px;
 }
 
 .entry-card h2,
@@ -610,9 +610,9 @@ fieldset {
 
 .results-stage {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 1fr;
   align-items: center;
-  gap: 18px;
+  gap: 12px;
   min-height: 304px;
   border-radius: 8px;
   padding: clamp(14px, 3vw, 28px);
@@ -626,23 +626,34 @@ fieldset {
 .live-question {
   grid-column: 1 / -1;
   max-width: 860px;
-  margin: 0 auto 8px;
+  margin: 0 auto;
   color: #fff;
   font-size: clamp(1.25rem, 2.4vw, 2rem);
   line-height: 1.18;
   text-align: center;
 }
 
-.countdown {
-  grid-column: 1 / -1;
-  justify-self: center;
+.live-metrics {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.45fr) minmax(0, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+
+.metric-card {
   display: inline-grid;
-  justify-items: center;
-  gap: 2px;
+  align-items: center;
+  min-height: 150px;
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.13);
-  padding: 8px 18px;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.12);
+  padding: 14px;
+}
+
+.countdown {
+  justify-items: center;
+  gap: 4px;
 }
 
 .countdown span {
@@ -660,13 +671,18 @@ fieldset {
   background: rgba(217, 45, 32, 0.22);
 }
 
+.average-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+}
+
 .results-stage .eyebrow,
 .results-stage p {
   color: rgba(255, 255, 255, 0.84);
 }
 
 .results-stage h1 {
-  font-size: clamp(4rem, 18vw, 10rem);
+  font-size: clamp(3rem, 10vw, 6rem);
 }
 
 .live-voters {
@@ -901,6 +917,11 @@ footer {
     grid-template-columns: 1fr;
     justify-items: center;
     min-height: 264px;
+  }
+
+  .live-metrics,
+  .average-card {
+    grid-template-columns: 1fr;
   }
 
   .share-row {
