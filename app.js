@@ -167,10 +167,13 @@ async function createSession(options = {}) {
   const code = sessionCode();
   const now = Date.now();
   const durationMinutes = Math.max(1, Number(options.durationMinutes || 10));
+  const type = options.type === "quiz" ? "quiz" : "scale";
   const session = {
     code,
     createdAt: now,
+    type,
     question: String(options.question || defaultQuestion).trim() || defaultQuestion,
+    quiz: type === "quiz" ? { questions: options.questions || [] } : null,
     durationMinutes,
     expiresAt: now + durationMinutes * 60 * 1000,
     participants: {},
@@ -250,6 +253,37 @@ async function vote(value) {
   render();
 }
 
+async function submitQuiz(event) {
+  event.preventDefault();
+  if (!appState.user) return;
+  const current = await fetchRemoteSession(appState.code) || getSession(appState.code);
+  if (isSessionClosed(current)) {
+    toast("El quiz ya esta cerrado.");
+    render();
+    return;
+  }
+  if (current.votes?.[appState.user.id]) {
+    toast("Tu quiz ya fue enviado.");
+    render();
+    return;
+  }
+  const form = new FormData(event.target);
+  const answers = {};
+  (current.quiz?.questions || []).forEach((question, qIndex) => {
+    answers[qIndex] = form.getAll(`q-${qIndex}`).map(Number);
+  });
+  const score = scoreQuiz(current, answers);
+  await upsertSession(appState.code, (session) => ({
+    ...session,
+    votes: {
+      ...session.votes,
+      [appState.user.id]: { answers, score, at: Date.now(), round: session.round }
+    }
+  }));
+  toast(`Quiz enviado. Puntaje: ${score}`);
+  render();
+}
+
 async function resetVotes() {
   await upsertSession(appState.code, (session) => {
     const stats = computeStats(session);
@@ -320,7 +354,7 @@ function exportSessionResults(session) {
     return [
       participant.name,
       avatar[1],
-      vote?.value ?? "",
+      session.type === "quiz" ? vote?.score ?? "" : vote?.value ?? "",
       vote?.at ? new Date(vote.at).toLocaleString("es-CO") : "",
       session.question,
       session.code,
@@ -335,19 +369,29 @@ function exportSessionResults(session) {
         ["Retox - Resultados de encuesta"],
         ["Vicepresidencia Experiencia Usuario Cliente - Grupo EPM"],
         ["Codigo", session.code],
+        ["Tipo", session.type === "quiz" ? "Quiz" : "Escala"],
         ["Pregunta", session.question],
-        ["Promedio", stats.count ? stats.average.toFixed(2) : ""],
+        [session.type === "quiz" ? "Promedio puntos" : "Promedio", stats.count ? stats.average.toFixed(2) : ""],
         ["Participantes", participants.length],
-        ["Votos", stats.count],
+        ["Respuestas", stats.count],
+        ...(session.type === "quiz" ? [["Puntaje maximo", stats.maxScore]] : []),
         [],
-        ["Nombre", "Avatar", "Voto", "Fecha voto", "Pregunta", "Codigo sesion", "Ronda"],
+        ["Nombre", "Avatar", session.type === "quiz" ? "Puntaje" : "Voto", "Fecha respuesta", "Pregunta", "Codigo sesion", "Ronda"],
         ...rows
       ]
     },
-    {
+    ...(session.type === "quiz" ? [{
+      name: "Quiz",
+      rows: [
+        ["Pregunta", "Opcion", "Correcta", "Puntos"],
+        ...(session.quiz?.questions || []).flatMap((question) =>
+          question.options.map((option) => [question.text, option.text, option.correct ? "Si" : "No", option.points])
+        )
+      ]
+    }] : [{
       name: "Distribucion",
       rows: [["Valor", "Cantidad"], ...distributionRows]
-    },
+    }]),
     {
       name: "Historial",
       rows: [
@@ -398,11 +442,35 @@ function excelWorkbook(sheets) {
 }
 
 function computeStats(session) {
+  if (session?.type === "quiz") return computeQuizStats(session);
   const values = Object.values(session?.votes || {}).map((vote) => Number(vote.value));
   const count = values.length;
   const average = count ? values.reduce((sum, value) => sum + value, 0) / count : 0;
   const distribution = Array.from({ length: 10 }, (_, index) => values.filter((value) => value === index + 1).length);
   return { average, count, distribution, max: Math.max(1, ...distribution) };
+}
+
+function scoreQuiz(session, answers) {
+  return (session.quiz?.questions || []).reduce((total, question, qIndex) => {
+    const selected = new Set((answers[qIndex] || []).map(Number));
+    return total + question.options.reduce((sum, option, index) => {
+      return sum + (option.correct && selected.has(index) ? Number(option.points || 0) : 0);
+    }, 0);
+  }, 0);
+}
+
+function maxQuizScore(session) {
+  return (session.quiz?.questions || []).reduce((total, question) => {
+    return total + question.options.reduce((sum, option) => sum + (option.correct ? Number(option.points || 0) : 0), 0);
+  }, 0);
+}
+
+function computeQuizStats(session) {
+  const votes = Object.values(session?.votes || {});
+  const count = votes.length;
+  const scores = votes.map((vote) => Number(vote.score || 0));
+  const average = count ? scores.reduce((sum, score) => sum + score, 0) / count : 0;
+  return { average, count, distribution: [], max: 1, maxScore: maxQuizScore(session), scores };
 }
 
 function remainingMs(session) {
@@ -506,8 +574,21 @@ function hostSetupView() {
         <form class="panel setup-panel" data-action="createSessionForm">
           <p class="eyebrow">Crear sesion</p>
           <h1>Nueva encuesta</h1>
+          <label for="session-type">Tipo de encuesta</label>
+          <select id="session-type" name="type" data-action="sessionType">
+            <option value="scale">Escala</option>
+            <option value="quiz">Quiz</option>
+          </select>
+          <div class="scale-config">
           <label for="setup-question">Pregunta</label>
           <textarea id="setup-question" name="question" rows="3">${defaultQuestion}</textarea>
+          </div>
+          <div class="quiz-config" hidden>
+            <div class="quiz-builder" id="quiz-builder">
+              ${quizQuestionTemplate(0)}
+            </div>
+            <button class="secondary" type="button" data-action="addQuizQuestion">Agregar pregunta</button>
+          </div>
           <label for="setup-duration">Tiempo maximo de vigencia en minutos</label>
           <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
           <button class="primary full" type="submit">Crear sesion</button>
@@ -517,6 +598,41 @@ function hostSetupView() {
       ${footer()}
     </main>
   `;
+}
+
+function quizQuestionTemplate(index) {
+  return `
+    <div class="quiz-question" data-question-index="${index}">
+      <label>Pregunta ${index + 1}</label>
+      <input name="quizQuestion" placeholder="Texto de la pregunta" />
+      <div class="quiz-options">
+        ${[0, 1, 2].map((optionIndex) => quizOptionTemplate(index, optionIndex)).join("")}
+      </div>
+      <button class="secondary compact-button" type="button" data-action="addQuizOption">Agregar opcion</button>
+    </div>
+  `;
+}
+
+function quizOptionTemplate(questionIndex, optionIndex) {
+  return `
+    <div class="quiz-option">
+      <input name="quizOption-${questionIndex}" placeholder="Opcion ${optionIndex + 1}" />
+      <label class="check-row"><input type="checkbox" name="quizCorrect-${questionIndex}-${optionIndex}" /> Correcta</label>
+      <input name="quizPoints-${questionIndex}-${optionIndex}" type="number" min="0" value="1" aria-label="Puntos" />
+    </div>
+  `;
+}
+
+function parseQuizForm(form) {
+  return [...form.querySelectorAll(".quiz-question")].map((node, qIndex) => {
+    const text = node.querySelector('[name="quizQuestion"]').value.trim();
+    const options = [...node.querySelectorAll(".quiz-option")].map((optionNode, optionIndex) => ({
+      text: optionNode.querySelector(`[name="quizOption-${qIndex}"]`)?.value.trim() || `Opcion ${optionIndex + 1}`,
+      correct: Boolean(optionNode.querySelector(`[name="quizCorrect-${qIndex}-${optionIndex}"]`)?.checked),
+      points: Number(optionNode.querySelector(`[name="quizPoints-${qIndex}-${optionIndex}"]`)?.value || 0)
+    })).filter((option) => option.text);
+    return { text: text || `Pregunta ${qIndex + 1}`, options };
+  }).filter((question) => question.options.length);
 }
 
 function adminHistoryPanel() {
@@ -559,9 +675,9 @@ function adminSessionRow(session) {
   return `
     <div class="admin-row">
       <strong>${escapeHtml(session.code)}</strong>
-      <span>${escapeHtml(session.question)}</span>
+      <span><b>${session.type === "quiz" ? "Quiz" : "Escala"}</b> · ${escapeHtml(session.question)}</span>
       <span>${stats.count}</span>
-      <span>${stats.count ? stats.average.toFixed(1) : "--"}</span>
+      <span>${stats.count ? stats.average.toFixed(1) : "--"}${session.type === "quiz" ? " pts" : ""}</span>
       <span class="admin-links">
         <a href="${links.host}" target="_blank" rel="noreferrer">Resultados</a>
         <a href="${links.participant}" target="_blank" rel="noreferrer">Participantes</a>
@@ -620,6 +736,7 @@ function avatarOption(id, label, icon, color, checked) {
 }
 
 function waitingView(session) {
+  if (session.type === "quiz") return quizParticipantView(session);
   const stats = computeStats(session);
   const voted = Boolean(session.votes[appState.user?.id]);
   const closed = isSessionClosed(session);
@@ -654,6 +771,45 @@ function waitingView(session) {
   `;
 }
 
+function quizParticipantView(session) {
+  const voted = Boolean(session.votes[appState.user?.id]);
+  const closed = isSessionClosed(session);
+  const vote = session.votes[appState.user?.id];
+  return `
+    <main class="app-grid">
+      ${roomHeader(session)}
+      <section class="participant-strip">
+        ${personChip(appState.user, "active-person")}
+        <button class="icon-button edit-person" data-action="editIdentity" aria-label="Cambiar nombre o avatar" title="Cambiar nombre o avatar">✎</button>
+      </section>
+      <section class="panel question-panel">
+        <p class="eyebrow">Quiz · ${closed ? "Cerrado" : `Tiempo restante ${formatRemaining(session)}`}</p>
+        <h1>${escapeHtml(session.question)}</h1>
+        <p>${session.quiz?.questions?.length || 0} preguntas · puntaje maximo ${maxQuizScore(session)}</p>
+      </section>
+      ${
+        voted
+          ? `<section class="panel score-panel"><p class="eyebrow">Puntaje obtenido</p><h1>${vote.score}</h1><p>Sobre ${maxQuizScore(session)} puntos posibles</p></section>`
+          : `<form class="panel quiz-answer-form" data-action="quizSubmitForm">
+              ${(session.quiz?.questions || []).map((question, qIndex) => `
+                <fieldset class="quiz-answer-question">
+                  <legend>${escapeHtml(question.text)}</legend>
+                  ${question.options.map((option, optionIndex) => `
+                    <label class="answer-option">
+                      <input type="checkbox" name="q-${qIndex}" value="${optionIndex}" ${closed ? "disabled" : ""} />
+                      <span>${escapeHtml(option.text)}</span>
+                    </label>
+                  `).join("")}
+                </fieldset>
+              `).join("")}
+              <button class="primary full" type="submit" ${closed ? "disabled" : ""}>Enviar quiz</button>
+            </form>`
+      }
+      ${footer()}
+    </main>
+  `;
+}
+
 function hostView(session) {
   const stats = computeStats(session);
   const links = sessionLinks(session.code);
@@ -661,10 +817,9 @@ function hostView(session) {
     <main class="host-layout">
       ${roomHeader(session)}
       <section class="host-main">
-        ${liveResultsPanel(session)}
-        <div class="panel">
-          <h2>Distribución respuestas</h2>
-          ${histogram(stats)}
+        <div class="results-row">
+          ${liveResultsPanel(session)}
+          ${resultsSidePanel(session)}
         </div>
       </section>
       <aside class="host-side">
@@ -708,15 +863,36 @@ function hostView(session) {
   `;
 }
 
+function resultsSidePanel(session) {
+  const stats = computeStats(session);
+  if (session.type === "quiz") {
+    return `
+      <div class="panel results-side">
+        <h2>Resultados quiz</h2>
+        <div class="quiz-summary">
+          <strong>${stats.count}</strong><span>participantes</span>
+          <strong>${stats.average.toFixed(1)}</strong><span>promedio puntos</span>
+          <strong>${stats.maxScore}</strong><span>puntos maximos</span>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div class="panel results-side">
+      <h2>Distribución respuestas</h2>
+      ${histogram(stats)}
+    </div>
+  `;
+}
+
 function displayView(session) {
   return `
     <main class="display-layout">
       ${roomHeader(session)}
       <section class="display-results">
-        ${liveResultsPanel(session)}
-        <div class="panel">
-          <h2>Distribución respuestas</h2>
-          ${histogram(computeStats(session))}
+        <div class="results-row">
+          ${liveResultsPanel(session)}
+          ${resultsSidePanel(session)}
         </div>
       </section>
       ${footer()}
@@ -737,11 +913,11 @@ function liveResultsPanel(session) {
         </div>
         <div class="metric-card average-card">
           <div>
-            <p class="eyebrow">Promedio en vivo</p>
+            <p class="eyebrow">${session.type === "quiz" ? "Promedio puntos" : "Promedio en vivo"}</p>
             <h1>${stats.count ? stats.average.toFixed(1) : "--"}</h1>
-            <p>${stats.count} votos de ${Object.keys(session.participants).length} participantes</p>
+            <p>${stats.count} respuestas de ${Object.keys(session.participants).length} participantes</p>
           </div>
-          ${thermometer(stats.average, true)}
+          ${session.type === "quiz" ? "" : thermometer(stats.average, true)}
         </div>
       </div>
       <div class="live-voters" aria-live="polite">
@@ -909,6 +1085,16 @@ document.addEventListener("click", async (event) => {
     appState.dark = !appState.dark;
     render();
   }
+  if (action === "addQuizQuestion") {
+    const builder = document.querySelector("#quiz-builder");
+    builder.insertAdjacentHTML("beforeend", quizQuestionTemplate(builder.querySelectorAll(".quiz-question").length));
+  }
+  if (action === "addQuizOption") {
+    const question = event.target.closest(".quiz-question");
+    const qIndex = Number(question.dataset.questionIndex);
+    const options = question.querySelector(".quiz-options");
+    options.insertAdjacentHTML("beforeend", quizOptionTemplate(qIndex, options.querySelectorAll(".quiz-option").length));
+  }
 });
 
 document.addEventListener("submit", async (event) => {
@@ -921,10 +1107,28 @@ document.addEventListener("submit", async (event) => {
   if (action === "questionForm") await updateQuestion(event);
   if (action === "hostAccessForm") enterAdmin(new FormData(event.target).get("hostPassword"));
   if (action === "createSessionForm") {
+    const form = event.target;
+    const type = new FormData(form).get("type");
+    const questions = type === "quiz" ? parseQuizForm(form) : [];
+    if (type === "quiz" && !questions.length) {
+      toast("Agrega al menos una pregunta para el quiz.");
+      return;
+    }
     await createSession({
-      question: new FormData(event.target).get("question"),
-      durationMinutes: new FormData(event.target).get("durationMinutes")
+      type,
+      question: type === "quiz" ? "Quiz" : new FormData(form).get("question"),
+      questions,
+      durationMinutes: new FormData(form).get("durationMinutes")
     });
+  }
+  if (action === "quizSubmitForm") await submitQuiz(event);
+});
+
+document.addEventListener("change", (event) => {
+  if (event.target.dataset.action === "sessionType") {
+    const isQuiz = event.target.value === "quiz";
+    document.querySelector(".quiz-config").hidden = !isQuiz;
+    document.querySelector(".scale-config").hidden = isQuiz;
   }
 });
 
