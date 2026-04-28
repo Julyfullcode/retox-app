@@ -295,6 +295,21 @@ function sessionLinks(code) {
   };
 }
 
+function qrUrl(value, size = 180) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}`;
+}
+
+function qrBlock(url, label = "QR participantes", size = 180) {
+  return `
+    <div class="qr-block">
+      <p class="eyebrow">${label}</p>
+      <a href="${qrUrl(url, 320)}" target="_blank" rel="noreferrer" aria-label="Abrir QR">
+        <img src="${qrUrl(url, size)}" alt="${label}" loading="lazy" />
+      </a>
+    </div>
+  `;
+}
+
 function exportSessionResults(session) {
   if (!session) return;
   const stats = computeStats(session);
@@ -523,6 +538,7 @@ function adminHistoryPanel() {
                   <span>Votos</span>
                   <span>Promedio</span>
                   <span>Links</span>
+                  <span>QR</span>
                   <span>Excel</span>
                 </div>
                 ${sessions.map((session) => adminSessionRow(session)).join("")}
@@ -550,6 +566,7 @@ function adminSessionRow(session) {
         <a href="${links.host}" target="_blank" rel="noreferrer">Resultados</a>
         <a href="${links.participant}" target="_blank" rel="noreferrer">Participantes</a>
       </span>
+      ${qrBlock(links.participant, "QR", 74)}
       <button class="secondary compact-button" data-export-code="${escapeHtml(session.code)}">Descargar</button>
     </div>
   `;
@@ -658,6 +675,7 @@ function hostView(session) {
             <input class="share-link" readonly value="${links.participant}" aria-label="Link de invitacion" />
             <button class="secondary copy-button" data-copy-url="${links.participant}">Copiar URL</button>
           </div>
+          ${qrBlock(links.participant)}
         </section>
         <section class="panel">
           <form data-action="questionForm">
