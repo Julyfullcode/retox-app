@@ -196,6 +196,7 @@ async function createSession(options = {}) {
     createdAt: now,
     type,
     question: String(options.question || defaultQuestion).trim() || defaultQuestion,
+    scaleMax: Math.max(2, Math.min(10, Number(options.scaleMax || 10))),
     quiz: type === "quiz" ? { questions: options.questions || [] } : null,
     durationMinutes,
     expiresAt: now + durationMinutes * 60 * 1000,
@@ -469,7 +470,8 @@ function computeStats(session) {
   const values = Object.values(session?.votes || {}).map((vote) => Number(vote.value));
   const count = values.length;
   const average = count ? values.reduce((sum, value) => sum + value, 0) / count : 0;
-  const distribution = Array.from({ length: 10 }, (_, index) => values.filter((value) => value === index + 1).length);
+  const scaleMax = Number(session?.scaleMax || 10);
+  const distribution = Array.from({ length: scaleMax }, (_, index) => values.filter((value) => value === index + 1).length);
   return { average, count, distribution, max: Math.max(1, ...distribution) };
 }
 
@@ -595,6 +597,7 @@ function hostSetupView() {
     return `
       <main class="admin-layout">
         ${roomHeader({ code: "Host" })}
+        <button class="back-button" data-host-back="menu">Atras</button>
         ${adminHistoryPanel()}
         ${footer()}
       </main>
@@ -604,6 +607,7 @@ function hostSetupView() {
   return `
     <main class="admin-layout">
       ${roomHeader({ code: "Host" })}
+      <button class="back-button" data-host-back="menu">Atras</button>
       <section class="host-portal">
         <form class="panel setup-panel" data-action="createSessionForm">
           <p class="eyebrow">Crear sesion</p>
@@ -612,6 +616,8 @@ function hostSetupView() {
           <div class="scale-config" ${appState.surveyType === "quiz" ? "hidden" : ""}>
           <label for="setup-question">Pregunta</label>
           <textarea id="setup-question" name="question" rows="3">${defaultQuestion}</textarea>
+          <label for="setup-scale-max">Numero maximo de escala</label>
+          <input id="setup-scale-max" name="scaleMax" type="number" min="2" max="10" value="10" />
           </div>
           <div class="quiz-config" ${appState.surveyType === "quiz" ? "" : "hidden"}>
             <div class="quiz-builder" id="quiz-builder">
@@ -634,6 +640,7 @@ function hostMenuView() {
   return `
     <main class="admin-layout">
       ${roomHeader({ code: "Host" })}
+      <button class="back-button" data-host-back="menu">Atras</button>
       <section class="host-menu">
         ${hostActionCard("create", "Crear encuesta", "Configura una escala o un quiz para compartir en vivo.", "chart")}
         ${hostActionCard("history", "Historial", "Consulta resultados, QR, enlaces, Excel y elimina encuestas.", "archive")}
@@ -824,6 +831,7 @@ function waitingView(session) {
   const voted = Boolean(session.votes[appState.user?.id]);
   const closed = isSessionClosed(session);
   const locked = closed || voted;
+  const scaleMax = Number(session.scaleMax || 10);
   return `
     <main class="app-grid">
       ${roomHeader(session)}
@@ -837,7 +845,7 @@ function waitingView(session) {
         <p>${closed ? "Votacion cerrada" : `Tiempo restante ${formatRemaining(session)}`} · ${Object.keys(session.participants).length} participantes conectados</p>
       </section>
       <section class="vote-board">
-        ${Array.from({ length: 10 }, (_, index) => {
+        ${Array.from({ length: scaleMax }, (_, index) => {
           const value = index + 1;
           return `<button class="vote-tile ${voted && session.votes[appState.user.id].value === value ? "selected" : ""}" data-vote="${value}" ${locked ? "disabled" : ""}>${value}</button>`;
         }).join("")}
@@ -1027,10 +1035,12 @@ function roomHeader(session) {
 }
 
 function thermometer(value, large = false) {
-  const percent = Math.max(0, Math.min(100, ((value || 0) - 1) / 9 * 100));
+  const session = getSession(appState.code);
+  const scaleMax = Number(session?.scaleMax || 10);
+  const percent = Math.max(0, Math.min(100, ((value || 0) - 1) / Math.max(1, scaleMax - 1) * 100));
   return `
     <div class="thermo ${large ? "large" : ""}" style="--level:${percent}%">
-      <div class="thermo-scale"><span>10</span><span>5</span><span>1</span></div>
+      <div class="thermo-scale"><span>${scaleMax}</span><span>${Math.ceil(scaleMax / 2)}</span><span>1</span></div>
       <div class="thermo-track"><div class="thermo-fill"></div></div>
       <div class="thermo-value">${value ? value.toFixed(1) : "--"}</div>
     </div>
@@ -1150,6 +1160,7 @@ document.addEventListener("click", async (event) => {
   const copyUrl = event.target.closest("[data-copy-url]")?.dataset.copyUrl;
   const displayUrl = event.target.closest("[data-open-display]")?.dataset.openDisplay;
   const hostCard = event.target.closest("[data-host-card]")?.dataset.hostCard;
+  const hostBack = event.target.closest("[data-host-back]")?.dataset.hostBack;
   if (voteValue) await vote(Number(voteValue));
   if (exportCode) exportSessionResults(getSession(exportCode));
   if (deleteCode) await deleteSession(deleteCode);
@@ -1166,6 +1177,10 @@ document.addEventListener("click", async (event) => {
   if (["scale", "quiz"].includes(hostCard)) {
     appState.surveyType = hostCard;
     appState.hostSection = "create";
+    render();
+  }
+  if (hostBack) {
+    appState.hostSection = hostBack;
     render();
   }
   if (action === "resetVotes") await resetVotes();
@@ -1216,6 +1231,7 @@ document.addEventListener("submit", async (event) => {
     await createSession({
       type,
       question: type === "quiz" ? "Quiz" : new FormData(form).get("question"),
+      scaleMax: new FormData(form).get("scaleMax"),
       questions,
       durationMinutes: new FormData(form).get("durationMinutes")
     });

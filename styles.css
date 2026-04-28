@@ -587,7 +587,7 @@ fieldset {
 .quiz-options,
 .quiz-answer-form {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .quiz-question,
@@ -597,13 +597,20 @@ fieldset {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
+  min-width: 0;
 }
 
 .quiz-option {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 90px;
+  grid-template-columns: minmax(170px, 1fr) minmax(92px, auto) 76px;
   gap: 8px;
   align-items: center;
+  min-width: 0;
+  font-size: 0.86rem;
+}
+
+.quiz-option input {
+  min-width: 0;
 }
 
 .check-row,
@@ -613,6 +620,8 @@ fieldset {
   gap: 8px;
   color: var(--ink);
   font-weight: 700;
+  min-width: 0;
+  white-space: normal;
 }
 
 .answer-option {
@@ -887,12 +896,16 @@ footer {
   grid-template-columns: 1fr;
   gap: 16px;
   align-items: start;
+  width: min(900px, 100%);
+  margin: 0 auto;
 }
 
 .host-menu {
   display: grid;
   grid-template-columns: repeat(2, minmax(240px, 1fr));
   gap: 18px;
+  width: min(760px, 100%);
+  margin: clamp(28px, 7vh, 72px) auto 0;
   align-items: stretch;
 }
 
@@ -952,6 +965,17 @@ footer {
 
 .host-card-art.quiz {
   background: linear-gradient(135deg, #b6e23a, #1f6fb2);
+}
+
+.back-button {
+  width: fit-content;
+  min-height: 42px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--green), var(--green-2));
+  color: #fff;
+  padding: 0 16px;
+  font-weight: 800;
+  margin-bottom: 12px;
 }
 
 .setup-panel {
