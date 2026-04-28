@@ -26,6 +26,7 @@ python -m http.server 4173 --bind 127.0.0.1
 4. Ingresar nombre, elegir avatar y votar del 1 al 10.
 5. El host ve promedio, termometro, participantes, histograma e historial al resetear.
 6. Desde el dashboard host, usar `Exportar Excel` para descargar votos, distribucion e historial en formato `.xls`.
+7. Desde el inicio, ingresar `Premio123` en `Acceso historial` para ver todas las encuestas y descargar sus resultados.
 
 ## Implementacion
 

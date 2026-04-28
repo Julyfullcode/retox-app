@@ -162,12 +162,14 @@ h2 {
   padding: 16px;
 }
 
-.code-form {
+.code-form,
+.admin-form {
   display: grid;
   gap: 8px;
 }
 
-.code-form div {
+.code-form div,
+.admin-form div {
   display: grid;
   grid-template-columns: minmax(112px, 150px) auto;
   gap: 10px;
@@ -434,7 +436,7 @@ fieldset {
 
 .thermo.large {
   grid-template-columns: auto 58px;
-  grid-template-rows: 300px auto;
+  grid-template-rows: 230px auto;
   width: 132px;
 }
 
@@ -499,10 +501,17 @@ fieldset {
 
 .bar-wrap {
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: auto 1fr auto;
   align-items: end;
   height: 150px;
   gap: 6px;
+}
+
+.bar-wrap strong {
+  min-height: 18px;
+  color: var(--ink);
+  text-align: center;
+  font-size: 0.78rem;
 }
 
 .bar-wrap span {
@@ -539,7 +548,7 @@ fieldset {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 18px;
-  min-height: 420px;
+  min-height: 344px;
   border-radius: 8px;
   padding: clamp(18px, 5vw, 42px);
   background:
@@ -571,14 +580,18 @@ fieldset {
 .live-voters {
   grid-column: 1 / -1;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
   gap: 8px;
   width: 100%;
-  min-height: 48px;
-  max-height: 132px;
-  overflow: auto;
+  min-height: 46px;
+  max-height: 46px;
+  overflow: hidden;
   padding-top: 4px;
+}
+
+.live-voters .person-chip {
+  max-width: 140px;
 }
 
 .waiting-votes {
@@ -646,6 +659,67 @@ footer {
   animation: toast-in 0.2s ease;
 }
 
+.admin-layout {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: 18px;
+}
+
+.admin-panel {
+  padding: 20px;
+}
+
+.admin-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.admin-head h1 {
+  margin-bottom: 0;
+  font-size: clamp(2rem, 6vw, 4rem);
+}
+
+.admin-table {
+  display: grid;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.admin-row {
+  display: grid;
+  grid-template-columns: 84px minmax(240px, 1.4fr) 70px 88px 180px 120px;
+  align-items: center;
+  gap: 10px;
+  min-width: 900px;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+.admin-row-head {
+  color: var(--blue);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.admin-links {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-links a {
+  color: var(--green);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.compact-button {
+  min-height: 38px;
+  padding: 0 12px;
+}
+
 @keyframes toast-in {
   from {
     opacity: 0;
@@ -680,7 +754,8 @@ footer {
     grid-template-columns: 1fr;
   }
 
-  .code-form div {
+  .code-form div,
+  .admin-form div {
     grid-template-columns: minmax(104px, 132px) auto;
   }
 
@@ -700,7 +775,7 @@ footer {
   .results-stage {
     grid-template-columns: 1fr;
     justify-items: center;
-    min-height: 360px;
+    min-height: 284px;
   }
 
   .brand-mark {

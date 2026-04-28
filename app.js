@@ -267,8 +267,19 @@ async function addDemoVotes() {
   });
 }
 
-function exportResults() {
-  const session = getSession(appState.code);
+function appBaseUrl() {
+  return location.href.split("#")[0];
+}
+
+function sessionLinks(code) {
+  const base = appBaseUrl();
+  return {
+    host: `${base}#host=${code}`,
+    participant: `${base}#join=${code}`
+  };
+}
+
+function exportSessionResults(session) {
   if (!session) return;
   const stats = computeStats(session);
   const participants = Object.values(session.participants);
@@ -330,6 +341,10 @@ function exportResults() {
   toast("Excel exportado.");
 }
 
+function exportResults() {
+  exportSessionResults(getSession(appState.code));
+}
+
 function excelWorkbook(sheets) {
   const sheetHtml = sheets
     .map(
@@ -377,7 +392,7 @@ function votedPeople(session) {
   return Object.entries(session.votes)
     .map(([userId, vote]) => ({ ...session.participants[userId], vote }))
     .filter((person) => person.id)
-    .sort((a, b) => b.vote.at - a.vote.at);
+    .sort((a, b) => a.vote.at - b.vote.at);
 }
 
 function logo() {
@@ -414,11 +429,80 @@ function welcomeView() {
               <button class="secondary" type="submit">Unirme</button>
             </div>
           </form>
+          <form data-action="adminForm" class="admin-form">
+            <label for="admin-code">Acceso historial</label>
+            <div>
+              <input id="admin-code" name="adminCode" placeholder="Codigo" autocomplete="off" />
+              <button class="secondary" type="submit">Entrar</button>
+            </div>
+          </form>
         </div>
       </section>
       ${footer()}
     </main>
   `;
+}
+
+function adminView() {
+  const sessions = Object.values(loadSessions()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  return `
+    <main class="admin-layout">
+      ${roomHeader({ code: "Historial" })}
+      <section class="panel admin-panel">
+        <div class="admin-head">
+          <div>
+            <p class="eyebrow">Historial de encuestas</p>
+            <h1>Resultados Retox</h1>
+          </div>
+          <button class="secondary" data-action="home">Volver</button>
+        </div>
+        ${
+          sessions.length
+            ? `<div class="admin-table">
+                <div class="admin-row admin-row-head">
+                  <span>Codigo</span>
+                  <span>Pregunta</span>
+                  <span>Votos</span>
+                  <span>Promedio</span>
+                  <span>Links</span>
+                  <span>Excel</span>
+                </div>
+                ${sessions.map((session) => adminSessionRow(session)).join("")}
+              </div>`
+            : `<p class="muted">Todavia no hay encuestas guardadas.</p>`
+        }
+      </section>
+      ${footer()}
+    </main>
+  `;
+}
+
+function adminSessionRow(session) {
+  const stats = computeStats(session);
+  const links = sessionLinks(session.code);
+  return `
+    <div class="admin-row">
+      <strong>${escapeHtml(session.code)}</strong>
+      <span>${escapeHtml(session.question)}</span>
+      <span>${stats.count}</span>
+      <span>${stats.count ? stats.average.toFixed(1) : "--"}</span>
+      <span class="admin-links">
+        <a href="${links.host}" target="_blank" rel="noreferrer">Resultados</a>
+        <a href="${links.participant}" target="_blank" rel="noreferrer">Participantes</a>
+      </span>
+      <button class="secondary compact-button" data-export-code="${escapeHtml(session.code)}">Descargar</button>
+    </div>
+  `;
+}
+
+function enterAdmin(code) {
+  if (String(code || "").trim() !== "Premio123") {
+    toast("Codigo de historial incorrecto.");
+    return;
+  }
+  appState = { ...appState, view: "admin", code: "", hostMode: false };
+  history.replaceState(null, "", `${location.pathname}#admin`);
+  render();
 }
 
 function identifyView() {
@@ -493,8 +577,8 @@ function waitingView(session) {
 
 function hostView(session) {
   const stats = computeStats(session);
-  const link = `${location.href.split("#")[0]}#join=${session.code}`;
-  const people = votedPeople(session);
+  const links = sessionLinks(session.code);
+  const people = votedPeople(session).slice(-5);
   return `
     <main class="host-layout">
       ${roomHeader(session)}
@@ -524,7 +608,7 @@ function hostView(session) {
         <section class="panel">
           <p class="eyebrow">Codigo de sala</p>
           <div class="room-code">${session.code}</div>
-          <input class="share-link" readonly value="${link}" aria-label="Link de invitacion" />
+          <input class="share-link" readonly value="${links.participant}" aria-label="Link de invitacion" />
         </section>
         <section class="panel">
           <form data-action="questionForm">
@@ -582,7 +666,7 @@ function histogram(stats) {
   return `
     <div class="histogram">
       ${stats.distribution
-        .map((count, index) => `<div class="bar-wrap"><span style="height:${(count / stats.max) * 100}%"></span><small>${index + 1}</small></div>`)
+        .map((count, index) => `<div class="bar-wrap"><strong>${count}</strong><span style="height:${(count / stats.max) * 100}%"></span><small>${index + 1}</small></div>`)
         .join("")}
     </div>
   `;
@@ -614,6 +698,17 @@ function render() {
   const root = document.querySelector("#app");
   document.body.classList.toggle("dark", appState.dark);
   const hashJoin = location.hash.match(/join=([A-Z0-9]{4})/i);
+  const hashHost = location.hash.match(/host=([A-Z0-9]{4})/i);
+  if (hashHost && appState.view === "welcome") {
+    const linkedCode = hashHost[1].toUpperCase();
+    if (getSession(linkedCode)) {
+      appState.code = linkedCode;
+      appState.view = "host";
+      appState.hostMode = true;
+    } else {
+      appState.code = linkedCode;
+    }
+  }
   if (hashJoin && appState.view === "welcome") {
     const linkedCode = hashJoin[1].toUpperCase();
     if (getSession(linkedCode)) {
@@ -626,16 +721,18 @@ function render() {
   }
 
   const session = appState.code ? getSession(appState.code) : null;
-  if (appState.view !== "welcome" && !session) appState.view = "welcome";
+  if (!["welcome", "admin"].includes(appState.view) && !session) appState.view = "welcome";
 
   root.innerHTML =
     appState.view === "welcome"
       ? welcomeView()
-      : appState.view === "identify"
-        ? identifyView()
-        : appState.view === "host"
-          ? hostView(session)
-          : waitingView(session);
+      : appState.view === "admin"
+        ? adminView()
+        : appState.view === "identify"
+          ? identifyView()
+          : appState.view === "host"
+            ? hostView(session)
+            : waitingView(session);
 
   if (hashJoin && appState.view === "welcome") {
     const input = document.querySelector("#code");
@@ -646,7 +743,9 @@ function render() {
 document.addEventListener("click", async (event) => {
   const action = event.target.closest("[data-action]")?.dataset.action;
   const voteValue = event.target.closest("[data-vote]")?.dataset.vote;
+  const exportCode = event.target.closest("[data-export-code]")?.dataset.exportCode;
   if (voteValue) await vote(Number(voteValue));
+  if (exportCode) exportSessionResults(getSession(exportCode));
   if (action === "createSession") await createSession();
   if (action === "resetVotes") await resetVotes();
   if (action === "addDemoVotes") await addDemoVotes();
@@ -657,7 +756,7 @@ document.addEventListener("click", async (event) => {
   }
   if (action === "home") {
     appState = { ...appState, view: "welcome", code: "", hostMode: false };
-    history.replaceState(null, "", location.pathname);
+    history.replaceState(null, "", appBaseUrl());
     render();
   }
   if (action === "toggleDark") {
@@ -671,6 +770,7 @@ document.addEventListener("submit", async (event) => {
   if (!action) return;
   event.preventDefault();
   if (action === "joinForm") await joinSession(new FormData(event.target).get("code"));
+  if (action === "adminForm") enterAdmin(new FormData(event.target).get("adminCode"));
   if (action === "identityForm") await submitIdentity(event);
   if (action === "questionForm") await updateQuestion(event);
 });
