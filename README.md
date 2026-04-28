@@ -55,6 +55,7 @@ alter table public.retox_sessions enable row level security;
 drop policy if exists "Allow public read" on public.retox_sessions;
 drop policy if exists "Allow public insert" on public.retox_sessions;
 drop policy if exists "Allow public update" on public.retox_sessions;
+drop policy if exists "Allow public delete" on public.retox_sessions;
 
 create policy "Allow public read"
 on public.retox_sessions
@@ -74,6 +75,12 @@ for update
 to anon
 using (true)
 with check (true);
+
+create policy "Allow public delete"
+on public.retox_sessions
+for delete
+to anon
+using (true);
 
 do $$
 begin

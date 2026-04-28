@@ -889,6 +889,71 @@ footer {
   align-items: start;
 }
 
+.host-menu {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+
+.host-card {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  min-height: 310px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  color: var(--ink);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.host-card:hover {
+  transform: translateY(-2px);
+}
+
+.host-card strong {
+  color: var(--green);
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+}
+
+.host-card small {
+  max-width: 320px;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.host-card-art {
+  display: grid;
+  place-items: center;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(182, 226, 58, 0.82), rgba(11, 143, 72, 0.92));
+  box-shadow: 0 18px 42px rgba(11, 143, 72, 0.2);
+}
+
+.host-card-art svg {
+  width: 112px;
+  height: 112px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.host-card-art.archive {
+  background: linear-gradient(135deg, #1f6fb2, #0b8f48);
+}
+
+.host-card-art.quiz {
+  background: linear-gradient(135deg, #b6e23a, #1f6fb2);
+}
+
 .setup-panel {
   display: grid;
   gap: 12px;
@@ -921,13 +986,22 @@ footer {
 
 .admin-row {
   display: grid;
-  grid-template-columns: 70px minmax(220px, 1.4fr) 56px 72px 154px 88px 104px;
+  grid-template-columns: 70px minmax(220px, 1.4fr) 56px 72px 154px 88px 104px 92px;
   align-items: center;
   gap: 8px;
   min-width: 760px;
   border-bottom: 1px solid var(--line);
   padding: 8px 0;
   font-size: 0.84rem;
+}
+
+.danger-button {
+  min-height: 38px;
+  border-radius: 8px;
+  background: #d92d20;
+  color: #fff;
+  padding: 0 12px;
+  font-weight: 800;
 }
 
 .admin-row .qr-block {
@@ -992,7 +1066,8 @@ footer {
   }
 
   .entry-grid,
-  .host-portal {
+  .host-portal,
+  .host-menu {
     grid-template-columns: 1fr;
   }
 

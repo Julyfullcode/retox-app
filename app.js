@@ -40,7 +40,9 @@ let appState = {
   code: "",
   user: loadActiveUser(),
   hostMode: false,
-  dark: false
+  dark: false,
+  hostSection: "menu",
+  surveyType: "scale"
 };
 
 function uid() {
@@ -116,6 +118,27 @@ async function persistSession(session) {
   }
 
   window.dispatchEvent(new Event("retox:update"));
+}
+
+async function deleteSession(code) {
+  if (!code) return;
+  if (!confirm(`Eliminar definitivamente la encuesta ${code}?`)) return;
+  const { [code]: _removed, ...rest } = sessionCache;
+  sessionCache = rest;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionCache));
+
+  if (supabaseClient) {
+    const { error } = await supabaseClient.from(SUPABASE_TABLE).delete().eq("code", code);
+    if (error) {
+      toast("No pude eliminar en Supabase. Revisa permisos delete.");
+      console.warn("Error eliminando encuesta:", error.message);
+    } else {
+      toast("Encuesta eliminada.");
+    }
+  } else {
+    toast("Encuesta eliminada localmente.");
+  }
+  render();
 }
 
 function subscribeToRemoteSessions() {
@@ -567,23 +590,30 @@ function welcomeView() {
 }
 
 function hostSetupView() {
+  if (appState.hostSection === "menu") return hostMenuView();
+  if (appState.hostSection === "history") {
+    return `
+      <main class="admin-layout">
+        ${roomHeader({ code: "Host" })}
+        ${adminHistoryPanel()}
+        ${footer()}
+      </main>
+    `;
+  }
+  if (appState.hostSection === "typeChoice") return surveyTypeChoiceView();
   return `
     <main class="admin-layout">
       ${roomHeader({ code: "Host" })}
       <section class="host-portal">
         <form class="panel setup-panel" data-action="createSessionForm">
           <p class="eyebrow">Crear sesion</p>
-          <h1>Nueva encuesta</h1>
-          <label for="session-type">Tipo de encuesta</label>
-          <select id="session-type" name="type" data-action="sessionType">
-            <option value="scale">Escala</option>
-            <option value="quiz">Quiz</option>
-          </select>
-          <div class="scale-config">
+          <h1>${appState.surveyType === "quiz" ? "Nuevo quiz" : "Nueva escala"}</h1>
+          <input type="hidden" name="type" value="${appState.surveyType}" />
+          <div class="scale-config" ${appState.surveyType === "quiz" ? "hidden" : ""}>
           <label for="setup-question">Pregunta</label>
           <textarea id="setup-question" name="question" rows="3">${defaultQuestion}</textarea>
           </div>
-          <div class="quiz-config" hidden>
+          <div class="quiz-config" ${appState.surveyType === "quiz" ? "" : "hidden"}>
             <div class="quiz-builder" id="quiz-builder">
               ${quizQuestionTemplate(0)}
             </div>
@@ -598,6 +628,57 @@ function hostSetupView() {
       ${footer()}
     </main>
   `;
+}
+
+function hostMenuView() {
+  return `
+    <main class="admin-layout">
+      ${roomHeader({ code: "Host" })}
+      <section class="host-menu">
+        ${hostActionCard("create", "Crear encuesta", "Configura una escala o un quiz para compartir en vivo.", "chart")}
+        ${hostActionCard("history", "Historial", "Consulta resultados, QR, enlaces, Excel y elimina encuestas.", "archive")}
+      </section>
+      ${footer()}
+    </main>
+  `;
+}
+
+function surveyTypeChoiceView() {
+  return `
+    <main class="admin-layout">
+      ${roomHeader({ code: "Host" })}
+      <section class="host-menu">
+        ${hostActionCard("scale", "Escala", "Votacion numerica del 1 al 10 con promedio y distribucion.", "scale")}
+        ${hostActionCard("quiz", "Quiz", "Preguntas con respuestas correctas, puntos y puntaje final.", "quiz")}
+      </section>
+      ${footer()}
+    </main>
+  `;
+}
+
+function hostActionCard(action, title, text, icon) {
+  return `
+    <button class="host-card" data-host-card="${action}">
+      <span class="host-card-art ${icon}" aria-hidden="true">
+        ${hostCardSvg(icon)}
+      </span>
+      <strong>${title}</strong>
+      <small>${text}</small>
+    </button>
+  `;
+}
+
+function hostCardSvg(icon) {
+  if (icon === "archive") {
+    return `<svg viewBox="0 0 120 120"><rect x="22" y="30" width="76" height="62" rx="10"/><path d="M30 46h60M43 64h34M43 78h24"/></svg>`;
+  }
+  if (icon === "quiz") {
+    return `<svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="38"/><path d="M49 48c2-10 21-11 24 0 4 14-13 14-13 25M60 88h.5"/></svg>`;
+  }
+  if (icon === "scale") {
+    return `<svg viewBox="0 0 120 120"><path d="M24 84h72"/><path d="M32 74l15-20 18 11 24-30"/><circle cx="47" cy="54" r="6"/><circle cx="65" cy="65" r="6"/><circle cx="89" cy="35" r="6"/></svg>`;
+  }
+  return `<svg viewBox="0 0 120 120"><rect x="24" y="28" width="72" height="58" rx="12"/><path d="M40 68h12M58 68h12M76 68h12M40 50h12M58 50h12M76 50h12"/></svg>`;
 }
 
 function quizQuestionTemplate(index) {
@@ -656,6 +737,7 @@ function adminHistoryPanel() {
                   <span>Links</span>
                   <span>QR</span>
                   <span>Excel</span>
+                  <span>Eliminar</span>
                 </div>
                 ${sessions.map((session) => adminSessionRow(session)).join("")}
               </div>`
@@ -684,6 +766,7 @@ function adminSessionRow(session) {
       </span>
       ${qrBlock(links.participant, "QR", 74)}
       <button class="secondary compact-button" data-export-code="${escapeHtml(session.code)}">Descargar</button>
+      <button class="danger-button" data-delete-code="${escapeHtml(session.code)}" aria-label="Eliminar encuesta">Eliminar</button>
     </div>
   `;
 }
@@ -693,7 +776,7 @@ function enterAdmin(code) {
     toast("Contraseña de host incorrecta.");
     return;
   }
-  appState = { ...appState, view: "hostSetup", code: "", hostMode: true };
+  appState = { ...appState, view: "hostSetup", code: "", hostMode: true, hostSection: "menu" };
   history.replaceState(null, "", appBaseUrl());
   render();
 }
@@ -1063,12 +1146,28 @@ document.addEventListener("click", async (event) => {
   const action = event.target.closest("[data-action]")?.dataset.action;
   const voteValue = event.target.closest("[data-vote]")?.dataset.vote;
   const exportCode = event.target.closest("[data-export-code]")?.dataset.exportCode;
+  const deleteCode = event.target.closest("[data-delete-code]")?.dataset.deleteCode;
   const copyUrl = event.target.closest("[data-copy-url]")?.dataset.copyUrl;
   const displayUrl = event.target.closest("[data-open-display]")?.dataset.openDisplay;
+  const hostCard = event.target.closest("[data-host-card]")?.dataset.hostCard;
   if (voteValue) await vote(Number(voteValue));
   if (exportCode) exportSessionResults(getSession(exportCode));
+  if (deleteCode) await deleteSession(deleteCode);
   if (copyUrl) await copyToClipboard(copyUrl);
   if (displayUrl) window.open(displayUrl, "_blank", "noopener,noreferrer");
+  if (hostCard === "create") {
+    appState.hostSection = "typeChoice";
+    render();
+  }
+  if (hostCard === "history") {
+    appState.hostSection = "history";
+    render();
+  }
+  if (["scale", "quiz"].includes(hostCard)) {
+    appState.surveyType = hostCard;
+    appState.hostSection = "create";
+    render();
+  }
   if (action === "resetVotes") await resetVotes();
   if (action === "addDemoVotes") await addDemoVotes();
   if (action === "exportResults") exportResults();
@@ -1077,7 +1176,7 @@ document.addEventListener("click", async (event) => {
     render();
   }
   if (action === "home") {
-    appState = { ...appState, view: "welcome", code: "", hostMode: false };
+    appState = { ...appState, view: "welcome", code: "", hostMode: false, hostSection: "menu" };
     history.replaceState(null, "", appBaseUrl());
     render();
   }
