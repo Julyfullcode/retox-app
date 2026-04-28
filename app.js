@@ -518,6 +518,7 @@ function avatarById(id) {
 }
 
 function personChip(person, extra = "") {
+  if (!person) return "";
   const [, label, icon, color] = avatarById(person.avatar);
   return `
     <div class="person-chip ${extra}" style="--avatar-bg:${color}" title="${escapeHtml(label)}">
@@ -835,10 +836,6 @@ function waitingView(session) {
   return `
     <main class="app-grid">
       ${roomHeader(session)}
-      <section class="participant-strip">
-        ${personChip(appState.user, "active-person")}
-        <button class="icon-button edit-person" data-action="editIdentity" aria-label="Cambiar nombre o avatar" title="Cambiar nombre o avatar">✎</button>
-      </section>
       <section class="panel question-panel">
         <p class="eyebrow">Ronda ${session.round}</p>
         <h1>${escapeHtml(session.question)}</h1>
@@ -869,10 +866,6 @@ function quizParticipantView(session) {
   return `
     <main class="app-grid">
       ${roomHeader(session)}
-      <section class="participant-strip">
-        ${personChip(appState.user, "active-person")}
-        <button class="icon-button edit-person" data-action="editIdentity" aria-label="Cambiar nombre o avatar" title="Cambiar nombre o avatar">✎</button>
-      </section>
       <section class="panel question-panel">
         <p class="eyebrow">Quiz · ${closed ? "Cerrado" : `Tiempo restante ${formatRemaining(session)}`}</p>
         <h1>${escapeHtml(session.question)}</h1>
@@ -1023,12 +1016,14 @@ function liveResultsPanel(session) {
 }
 
 function roomHeader(session) {
+  const showUser = !appState.hostMode && appState.user && ["waiting", "identify"].includes(appState.view);
   return `
     <header class="room-header">
       ${logo()}
       <div class="room-meta">
-        <span>${session.code}</span>
-        <button class="home-button" data-action="home" aria-label="Inicio" title="Inicio">🏠</button>
+        ${showUser ? `<div class="header-person">${personChip(appState.user, "active-person")}<button class="top-control edit-person" data-action="editIdentity" aria-label="Cambiar nombre o avatar" title="Cambiar nombre o avatar">Editar</button></div>` : ""}
+        <span class="top-control">${session.code}</span>
+        <button class="top-control home-button" data-action="home" aria-label="Inicio" title="Inicio">Inicio</button>
       </div>
     </header>
   `;

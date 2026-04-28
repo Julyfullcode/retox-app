@@ -281,15 +281,7 @@ textarea:focus {
 }
 
 .home-button {
-  display: grid;
-  place-items: center;
-  width: 58px;
-  height: 58px;
-  border: 2px solid rgba(31, 111, 178, 0.24);
-  border-radius: 50%;
-  background: linear-gradient(135deg, #b6e23a, #0b8f48 48%, #1f6fb2);
-  box-shadow: 0 14px 30px rgba(11, 143, 72, 0.22);
-  font-size: 1.8rem;
+  box-shadow: 0 10px 22px rgba(11, 143, 72, 0.18);
 }
 
 .identity-panel {
@@ -375,16 +367,28 @@ fieldset {
 .room-meta {
   display: flex;
   align-items: center;
+  justify-content: end;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
-.room-meta span,
+.top-control,
 .room-code {
+  display: inline-grid;
+  place-items: center;
+  min-height: 42px;
   border-radius: 8px;
-  background: var(--ink);
-  color: var(--paper);
-  padding: 10px 12px;
+  border: 0;
+  background: linear-gradient(135deg, var(--green), var(--green-2));
+  color: #fff;
+  padding: 0 14px;
   font-weight: 900;
+}
+
+.header-person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .question-panel,
@@ -1137,5 +1141,15 @@ footer {
 
   .epm-logo {
     width: 150px;
+  }
+
+  .room-header {
+    align-items: start;
+  }
+
+  .header-person {
+    order: 3;
+    width: 100%;
+    justify-content: end;
   }
 }
