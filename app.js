@@ -291,6 +291,7 @@ async function saveVoteRow(code, user, vote) {
   const current = getSession(normalized);
   const round = Number(vote.round || current?.round || 1);
   if (current?.votes?.[user.id]) return false;
+  await saveParticipant(normalized, user);
   const localVote = {
     value: vote.value,
     answers: vote.answers,
@@ -302,7 +303,7 @@ async function saveVoteRow(code, user, vote) {
   if (!supabaseClient) {
     saveSessionToCache(hydrateSession({
       ...(current || { code: normalized, round }),
-      participants: current?.participants || {},
+      participants: { ...(current?.participants || {}), [user.id]: { ...user, joinedAt: current?.participants?.[user.id]?.joinedAt || Date.now() } },
       votes: { ...(current?.votes || {}), [user.id]: localVote }
     }));
     window.dispatchEvent(new Event("retox:update"));
@@ -327,7 +328,7 @@ async function saveVoteRow(code, user, vote) {
   }
   saveSessionToCache(hydrateSession({
     ...(current || { code: normalized, round }),
-    participants: current?.participants || {},
+    participants: { ...(current?.participants || {}), [user.id]: { ...user, joinedAt: current?.participants?.[user.id]?.joinedAt || Date.now() } },
     votes: { ...(current?.votes || {}), [user.id]: localVote }
   }));
   window.dispatchEvent(new Event("retox:update"));
@@ -742,7 +743,7 @@ function personChip(person, extra = "", action = "") {
 
 function votedPeople(session) {
   return Object.entries(session.votes)
-    .map(([userId, vote]) => ({ ...session.participants[userId], vote }))
+    .map(([userId, vote]) => ({ id: userId, name: "Participante", avatar: avatars[0][0], ...(session.participants[userId] || {}), vote }))
     .filter((person) => person.id)
     .sort((a, b) => a.vote.at - b.vote.at);
 }
@@ -1412,8 +1413,9 @@ function thermometer(value, large = false) {
 }
 
 function histogram(stats) {
+  const columns = Math.max(1, stats.distribution.length);
   return `
-    <div class="histogram">
+    <div class="histogram" style="--bars:${columns}">
       ${stats.distribution
         .map((count, index) => `<div class="bar-wrap"><strong>${count}</strong><span style="height:${(count / stats.max) * 100}%"></span><small>${index + 1}</small></div>`)
         .join("")}

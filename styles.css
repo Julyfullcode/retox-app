@@ -548,18 +548,11 @@ fieldset {
   overflow: hidden;
   border: 2px solid rgba(255, 255, 255, 0.9);
   border-radius: 999px;
-  background: linear-gradient(0deg, #0b8f48 0%, #80bd28 35%, #ffd84d 50%, #f28b2e 68%, #d92d20 100%);
+  background: rgba(255, 255, 255, 0.32);
 }
 
 .thermo-track::after {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: calc(100% - var(--level));
-  border-radius: 999px 999px 0 0;
-  background: rgba(255, 255, 255, 0.88);
-  transition: height 0.45s ease;
-  z-index: 2;
+  display: none;
 }
 
 .thermo-fill {
@@ -569,9 +562,8 @@ fieldset {
   left: 0;
   height: var(--level);
   border-radius: 999px;
-  background: transparent;
+  background: linear-gradient(0deg, #0b8f48 0%, #80bd28 35%, #ffd84d 50%, #f28b2e 68%, #d92d20 100%);
   transition: height 0.45s ease;
-  z-index: 1;
 }
 
 .thermo-value {
@@ -587,8 +579,9 @@ fieldset {
 
 .histogram {
   display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--bars, 10), 44px);
   align-items: end;
+  justify-content: center;
   gap: 6px;
   min-height: 184px;
 }
