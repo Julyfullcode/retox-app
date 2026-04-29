@@ -565,10 +565,12 @@ fieldset {
 
 .histogram {
   display: grid;
-  grid-template-columns: repeat(var(--bars, 10), 44px);
+  grid-template-columns: repeat(var(--bars, 10), minmax(0, 1fr));
   align-items: end;
   justify-content: center;
   gap: 6px;
+  width: 100%;
+  max-width: 100%;
   min-height: 184px;
 }
 
