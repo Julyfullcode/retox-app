@@ -349,7 +349,8 @@ function sessionLinks(code) {
   return {
     host: `${base}#host=${code}`,
     participant: `${base}#join=${code}`,
-    display: `${base}#display=${code}`
+    display: `${base}#display=${code}`,
+    invite: `${base}#invite=${code}`
   };
 }
 
@@ -357,11 +358,11 @@ function qrUrl(value, size = 180) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}`;
 }
 
-function qrBlock(url, label = "QR participantes", size = 180) {
+function qrBlock(url, label = "QR participantes", size = 180, openUrl = qrUrl(url, 320)) {
   return `
     <div class="qr-block">
       <p class="eyebrow">${label}</p>
-      <a href="${qrUrl(url, 320)}" target="_blank" rel="noreferrer" aria-label="Abrir QR">
+      <a href="${openUrl}" target="_blank" rel="noreferrer" aria-label="Abrir QR">
         <img src="${qrUrl(url, size)}" alt="${label}" loading="lazy" />
       </a>
     </div>
@@ -517,14 +518,16 @@ function avatarById(id) {
   return avatars.find(([avatarId]) => avatarId === id) || avatars[0];
 }
 
-function personChip(person, extra = "") {
+function personChip(person, extra = "", action = "") {
   if (!person) return "";
   const [, label, icon, color] = avatarById(person.avatar);
+  const tag = action ? "button" : "div";
+  const actionAttrs = action ? ` type="button" data-action="${action}" aria-label="Cambiar nombre o avatar"` : "";
   return `
-    <div class="person-chip ${extra}" style="--avatar-bg:${color}" title="${escapeHtml(label)}">
+    <${tag} class="person-chip ${extra}" style="--avatar-bg:${color}" title="${escapeHtml(label)}"${actionAttrs}>
       <span class="person-avatar" aria-hidden="true">${icon}</span>
       <span class="person-name">${escapeHtml(person.name)}</span>
-    </div>
+    </${tag}>
   `;
 }
 
@@ -598,7 +601,6 @@ function hostSetupView() {
     return `
       <main class="admin-layout">
         ${roomHeader({ code: "Host" })}
-        <button class="back-button" data-host-back="menu">Atras</button>
         ${adminHistoryPanel()}
         ${footer()}
       </main>
@@ -608,7 +610,6 @@ function hostSetupView() {
   return `
     <main class="admin-layout">
       ${roomHeader({ code: "Host" })}
-      <button class="back-button" data-host-back="menu">Atras</button>
       <section class="host-portal">
         <form class="panel setup-panel" data-action="createSessionForm">
           <p class="eyebrow">Crear sesion</p>
@@ -630,7 +631,6 @@ function hostSetupView() {
           <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
           <button class="primary full" type="submit">Crear sesion</button>
         </form>
-        ${adminHistoryPanel()}
       </section>
       ${footer()}
     </main>
@@ -641,7 +641,6 @@ function hostMenuView() {
   return `
     <main class="admin-layout">
       ${roomHeader({ code: "Host" })}
-      <button class="back-button" data-host-back="menu">Atras</button>
       <section class="host-menu">
         ${hostActionCard("create", "Crear encuesta", "Configura una escala o un quiz para compartir en vivo.", "chart")}
         ${hostActionCard("history", "Historial", "Consulta resultados, QR, enlaces, Excel y elimina encuestas.", "archive")}
@@ -772,7 +771,7 @@ function adminSessionRow(session) {
         <a href="${links.host}" target="_blank" rel="noreferrer">Resultados</a>
         <a href="${links.participant}" target="_blank" rel="noreferrer">Participantes</a>
       </span>
-      ${qrBlock(links.participant, "QR", 74)}
+      ${qrBlock(links.participant, "QR", 74, links.invite)}
       <button class="secondary compact-button" data-export-code="${escapeHtml(session.code)}">Descargar</button>
       <button class="danger-button" data-delete-code="${escapeHtml(session.code)}" aria-label="Eliminar encuesta">Eliminar</button>
     </div>
@@ -914,7 +913,7 @@ function hostView(session) {
             <input class="share-link" readonly value="${links.participant}" aria-label="Link de invitacion" />
             <button class="secondary copy-button" data-copy-url="${links.participant}">Copiar URL</button>
           </div>
-          ${qrBlock(links.participant)}
+          ${qrBlock(links.participant, "QR participantes", 180, links.invite)}
         </section>
         <section class="panel">
           <form data-action="questionForm">
@@ -984,6 +983,29 @@ function displayView(session) {
   `;
 }
 
+function inviteView(session) {
+  const links = sessionLinks(session.code);
+  return `
+    <main class="invite-layout">
+      <section class="invite-card">
+        <img class="invite-logo" src="./assets/logo-grupo-epm.png" alt="Grupo EPM" />
+        <p class="invite-vp">Vicepresidencia Experiencia Usuario Cliente</p>
+        <h1>Participa en Retox</h1>
+        <p class="invite-copy">Te invitamos a responder esta encuesta en vivo. Escanea el codigo QR o ingresa con el codigo de sala.</p>
+        <strong class="invite-code">${session.code}</strong>
+        <img class="invite-qr" src="${qrUrl(links.participant, 280)}" alt="QR para participar en Retox" />
+        <p class="invite-question">${escapeHtml(session.question)}</p>
+        <div class="invite-actions">
+          <a class="top-control" href="${links.participant}">Ir a la votacion</a>
+          <button class="top-control" data-action="home">Inicio</button>
+        </div>
+        <p class="invite-signature">Firma: Vicepresidencia Experiencia Usuario Cliente - Grupo EPM</p>
+      </section>
+      ${footer()}
+    </main>
+  `;
+}
+
 function liveResultsPanel(session) {
   const stats = computeStats(session);
   const people = votedPeople(session).slice(-5);
@@ -1017,16 +1039,26 @@ function liveResultsPanel(session) {
 
 function roomHeader(session) {
   const showUser = !appState.hostMode && appState.user && ["waiting", "identify"].includes(appState.view);
+  const hostBack = hostBackTarget();
   return `
     <header class="room-header">
       ${logo()}
       <div class="room-meta">
-        ${showUser ? `<div class="header-person">${personChip(appState.user, "active-person")}<button class="top-control edit-person" data-action="editIdentity" aria-label="Cambiar nombre o avatar" title="Cambiar nombre o avatar">Editar</button></div>` : ""}
+        ${showUser ? `<div class="header-person">${personChip(appState.user, "active-person header-edit-person", "editIdentity")}</div>` : ""}
         <span class="top-control">${session.code}</span>
         <button class="top-control home-button" data-action="home" aria-label="Inicio" title="Inicio">Inicio</button>
+        ${hostBack ? `<button class="top-control" data-host-back="${hostBack}">Atras</button>` : ""}
       </div>
     </header>
   `;
+}
+
+function hostBackTarget() {
+  if (appState.view !== "hostSetup") return "";
+  if (appState.hostSection === "history") return "menu";
+  if (appState.hostSection === "typeChoice") return "menu";
+  if (appState.hostSection === "create") return "typeChoice";
+  return "";
 }
 
 function thermometer(value, large = false) {
@@ -1095,6 +1127,16 @@ function render() {
   const hashJoin = location.hash.match(/join=([A-Z0-9]{4})/i);
   const hashHost = location.hash.match(/host=([A-Z0-9]{4})/i);
   const hashDisplay = location.hash.match(/display=([A-Z0-9]{4})/i);
+  const hashInvite = location.hash.match(/invite=([A-Z0-9]{4})/i);
+  if (hashInvite && appState.view === "welcome") {
+    const linkedCode = hashInvite[1].toUpperCase();
+    if (getSession(linkedCode)) {
+      appState.code = linkedCode;
+      appState.view = "invite";
+    } else {
+      appState.code = linkedCode;
+    }
+  }
   if (hashDisplay && appState.view === "welcome") {
     const linkedCode = hashDisplay[1].toUpperCase();
     if (getSession(linkedCode)) {
@@ -1139,7 +1181,9 @@ function render() {
             ? hostView(session)
             : appState.view === "display"
               ? displayView(session)
-              : waitingView(session);
+              : appState.view === "invite"
+                ? inviteView(session)
+                : waitingView(session);
 
   if (hashJoin && appState.view === "welcome") {
     const input = document.querySelector("#code");
