@@ -1403,10 +1403,33 @@ function thermometer(value, large = false) {
   const session = getSession(appState.code);
   const scaleMax = Number(session?.scaleMax || 10);
   const percent = Math.max(0, Math.min(100, ((value || 0) - 1) / Math.max(1, scaleMax - 1) * 100));
+  const trackWidth = large ? 64 : 34;
+  const trackHeight = large ? 248 : 150;
+  const fillHeight = value ? Math.max(8, (percent / 100) * trackHeight) : 0;
+  const fillY = trackHeight - fillHeight;
+  const radius = trackWidth / 2;
+  const gradientId = `thermo-gradient-${large ? "large" : "small"}-${Math.round(percent)}-${Math.round(Math.random() * 100000)}`;
   return `
     <div class="thermo ${large ? "large" : ""}" style="--level:${percent}%">
       <div class="thermo-scale"><span>${scaleMax}</span><span>${Math.ceil(scaleMax / 2)}</span><span>1</span></div>
-      <div class="thermo-track"><div class="thermo-fill"></div></div>
+      <svg class="thermo-svg" viewBox="0 0 ${trackWidth} ${trackHeight}" role="img" aria-label="Promedio ${value ? value.toFixed(1) : "sin votos"}">
+        <defs>
+          <linearGradient id="${gradientId}" x1="0" y1="${trackHeight}" x2="0" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#0b8f48" />
+            <stop offset="35%" stop-color="#80bd28" />
+            <stop offset="50%" stop-color="#ffd84d" />
+            <stop offset="68%" stop-color="#f28b2e" />
+            <stop offset="100%" stop-color="#d92d20" />
+          </linearGradient>
+          <clipPath id="${gradientId}-clip">
+            <rect x="2" y="2" width="${trackWidth - 4}" height="${trackHeight - 4}" rx="${radius}" />
+          </clipPath>
+        </defs>
+        <rect x="2" y="2" width="${trackWidth - 4}" height="${trackHeight - 4}" rx="${radius}" fill="rgba(255,255,255,0.32)" stroke="rgba(255,255,255,0.9)" stroke-width="4" />
+        <g clip-path="url(#${gradientId}-clip)">
+          <rect x="2" y="${fillY}" width="${trackWidth - 4}" height="${fillHeight}" fill="url(#${gradientId})" />
+        </g>
+      </svg>
       <div class="thermo-value">${value ? value.toFixed(1) : "--"}</div>
     </div>
   `;

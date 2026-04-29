@@ -542,28 +542,14 @@ fieldset {
   text-align: right;
 }
 
-.thermo-track {
-  position: relative;
+.thermo-svg {
+  display: block;
+  width: 34px;
   height: 100%;
-  overflow: hidden;
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.32);
 }
 
-.thermo-track::after {
-  display: none;
-}
-
-.thermo-fill {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: var(--level);
-  border-radius: 999px;
-  background: linear-gradient(0deg, #0b8f48 0%, #80bd28 35%, #ffd84d 50%, #f28b2e 68%, #d92d20 100%);
-  transition: height 0.45s ease;
+.thermo.large .thermo-svg {
+  width: 64px;
 }
 
 .thermo-value {
