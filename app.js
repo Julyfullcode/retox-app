@@ -8,6 +8,7 @@ const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY)
 let sessionCache = readLocalSessions();
 let realtimeChannel = null;
 let remoteReady = false;
+let remotePollInFlight = false;
 
 const avatars = [
   ["robot-bailarin", "Robot bailarin", "🤖", "#dff6ee"],
@@ -1131,6 +1132,7 @@ function inviteView(session) {
 function liveResultsPanel(session) {
   const stats = computeStats(session);
   const people = votedPeople(session).slice(-5);
+  const links = sessionLinks(session.code);
   return `
     <div class="results-stage">
       <h2 class="live-question">${escapeHtml(session.question)}</h2>
@@ -1138,6 +1140,12 @@ function liveResultsPanel(session) {
         <div class="metric-card countdown ${isSessionClosed(session) ? "closed" : ""}">
           <span>${isSessionClosed(session) ? "Votacion cerrada" : "Tiempo restante"}</span>
           <strong>${formatRemaining(session)}</strong>
+          ${session.type === "quiz" ? "" : `
+            <a class="live-qr" href="${links.invite}" target="_blank" rel="noreferrer" aria-label="Abrir invitación con QR">
+              <img src="${qrUrl(links.participant, 112)}" alt="QR para ingresar a la encuesta" />
+              <small>Escanea para participar</small>
+            </a>
+          `}
         </div>
         <div class="metric-card average-card">
           <div>
@@ -1430,8 +1438,17 @@ async function initApp() {
 
 initApp();
 
-setInterval(() => {
+setInterval(async () => {
   const focused = document.activeElement;
   const isEditing = focused && ["INPUT", "TEXTAREA", "SELECT"].includes(focused.tagName);
+  const shouldSync = appState.code && ["host", "waiting", "display", "invite"].includes(appState.view);
+  if (shouldSync && !remotePollInFlight) {
+    remotePollInFlight = true;
+    try {
+      await fetchRemoteSession(appState.code);
+    } finally {
+      remotePollInFlight = false;
+    }
+  }
   if (!isEditing && ["host", "waiting", "display"].includes(appState.view)) render();
-}, 1000);
+}, 1200);

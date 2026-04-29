@@ -547,18 +547,11 @@ fieldset {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: linear-gradient(0deg, #0b8f48 0%, #80bd28 35%, #ffd84d 50%, #f28b2e 68%, #d92d20 100%);
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .thermo-track::after {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: calc(100% - var(--level));
-  border-radius: 999px 999px 0 0;
-  background: color-mix(in srgb, var(--card) 86%, transparent);
-  backdrop-filter: saturate(0.5);
-  transition: height 0.45s ease;
+  display: none;
 }
 
 .thermo-fill {
@@ -568,7 +561,7 @@ fieldset {
   left: 0;
   height: var(--level);
   border-radius: 999px;
-  background: transparent;
+  background: linear-gradient(0deg, #0b8f48 0%, #80bd28 35%, #ffd84d 50%, #f28b2e 68%, #d92d20 100%);
   transition: height 0.45s ease;
 }
 
@@ -929,6 +922,29 @@ fieldset {
 .countdown strong {
   color: #fff;
   font-size: clamp(1.9rem, 5vw, 3.4rem);
+}
+
+.live-qr {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  color: #fff;
+  text-decoration: none;
+}
+
+.live-qr img {
+  width: 92px;
+  height: 92px;
+  border: 6px solid #fff;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+}
+
+.live-qr small {
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-align: center;
 }
 
 .countdown.closed {
