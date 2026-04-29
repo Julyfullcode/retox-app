@@ -615,21 +615,32 @@ function hostSetupView() {
           <p class="eyebrow">Crear sesion</p>
           <h1>${appState.surveyType === "quiz" ? "Nuevo quiz" : "Nueva escala"}</h1>
           <input type="hidden" name="type" value="${appState.surveyType}" />
-          <div class="scale-config" ${appState.surveyType === "quiz" ? "hidden" : ""}>
-          <label for="setup-question">Pregunta</label>
-          <textarea id="setup-question" name="question" rows="3">${defaultQuestion}</textarea>
-          <label for="setup-scale-max">Numero maximo de escala</label>
-          <input id="setup-scale-max" name="scaleMax" type="number" min="2" max="10" value="10" />
-          </div>
-          <div class="quiz-config" ${appState.surveyType === "quiz" ? "" : "hidden"}>
-            <div class="quiz-builder" id="quiz-builder">
-              ${quizQuestionTemplate(0)}
-            </div>
-            <button class="secondary" type="button" data-action="addQuizQuestion">Agregar pregunta</button>
-          </div>
-          <label for="setup-duration">Tiempo maximo de vigencia en minutos</label>
-          <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
-          <button class="primary full" type="submit">Crear sesion</button>
+          ${
+            appState.surveyType === "quiz"
+              ? `<div class="quiz-config">
+                  <div class="quiz-builder" id="quiz-builder">
+                    ${quizQuestionTemplate(0)}
+                  </div>
+                  <button class="secondary compact-button quiz-add-question" type="button" data-action="addQuizQuestion">Agregar pregunta</button>
+                  <label for="setup-duration">Tiempo maximo de vigencia en minutos</label>
+                  <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
+                </div>`
+              : `<div class="scale-config">
+                  <label for="setup-question">Pregunta</label>
+                  <textarea id="setup-question" name="question" rows="3">${defaultQuestion}</textarea>
+                  <div class="setup-inline-fields">
+                    <label class="field" for="setup-scale-max">
+                      <span>Numero maximo de escala</span>
+                      <input id="setup-scale-max" name="scaleMax" type="number" min="2" max="10" value="10" />
+                    </label>
+                    <label class="field" for="setup-duration">
+                      <span>Tiempo maximo de vigencia en minutos</span>
+                      <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
+                    </label>
+                  </div>
+                </div>`
+          }
+          <button class="primary full create-session-button" type="submit">Crear sesion</button>
         </form>
       </section>
       ${footer()}
@@ -693,6 +704,10 @@ function quizQuestionTemplate(index) {
     <div class="quiz-question" data-question-index="${index}">
       <label>Pregunta ${index + 1}</label>
       <input name="quizQuestion" placeholder="Texto de la pregunta" />
+      <div class="quiz-option-head" aria-hidden="true">
+        <span>Respuestas</span>
+        <span>Puntajes</span>
+      </div>
       <div class="quiz-options">
         ${[0, 1, 2].map((optionIndex) => quizOptionTemplate(index, optionIndex)).join("")}
       </div>

@@ -267,6 +267,10 @@ textarea:focus {
   color: #fff;
 }
 
+.create-session-button {
+  background: linear-gradient(135deg, var(--blue), #165f9f);
+}
+
 .full {
   width: 100%;
 }
@@ -605,6 +609,29 @@ fieldset {
   gap: 10px;
 }
 
+.scale-config {
+  display: grid;
+  gap: 12px;
+}
+
+.setup-inline-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field span,
+.quiz-option-head {
+  font-size: 0.82rem;
+  font-weight: 900;
+  color: var(--blue);
+}
+
 .quiz-question,
 .quiz-answer-question {
   display: grid;
@@ -613,6 +640,17 @@ fieldset {
   border-radius: 8px;
   padding: 12px;
   min-width: 0;
+}
+
+.quiz-option-head {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(92px, auto) 76px;
+  gap: 8px;
+  align-items: end;
+}
+
+.quiz-option-head span:last-child {
+  grid-column: 3;
 }
 
 .quiz-option {
@@ -1152,6 +1190,12 @@ footer {
   padding: 0 12px;
 }
 
+.quiz-question .compact-button,
+.quiz-add-question {
+  width: 170px;
+  justify-self: start;
+}
+
 @keyframes toast-in {
   from {
     opacity: 0;
@@ -1211,8 +1255,14 @@ footer {
   .live-metrics,
   .average-card,
   .results-row,
-  .quiz-option {
+  .setup-inline-fields,
+  .quiz-option,
+  .quiz-option-head {
     grid-template-columns: 1fr;
+  }
+
+  .quiz-option-head span:last-child {
+    grid-column: 1;
   }
 
   .share-row {
