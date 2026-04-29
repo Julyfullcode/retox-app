@@ -1032,8 +1032,62 @@ function resultsSidePanel(session) {
     <div class="panel results-side">
       <h2>Distribución respuestas</h2>
       ${histogram(stats)}
+      ${trendPanel(session)}
     </div>
   `;
+}
+
+function trendPanel(session) {
+  const trend = scaleTrend(session);
+  return `
+    <div class="trend-card ${trend.type}">
+      <span class="trend-arrow" aria-hidden="true">${trend.icon}</span>
+      <div>
+        <p>Tendencia en vivo</p>
+        <strong>${trend.title}</strong>
+        <small>${trend.detail}</small>
+      </div>
+    </div>
+  `;
+}
+
+function scaleTrend(session) {
+  const votes = Object.values(session?.votes || {})
+    .filter((vote) => Number.isFinite(Number(vote.value)))
+    .sort((a, b) => Number(a.at || 0) - Number(b.at || 0));
+  if (votes.length < 2) {
+    return {
+      type: "stable",
+      icon: "→",
+      title: "Esperando tendencia",
+      detail: "Se activa desde el segundo voto."
+    };
+  }
+  const current = votes.reduce((sum, vote) => sum + Number(vote.value), 0) / votes.length;
+  const previousVotes = votes.slice(0, -1);
+  const previous = previousVotes.reduce((sum, vote) => sum + Number(vote.value), 0) / previousVotes.length;
+  const diff = current - previous;
+  if (Math.abs(diff) < 0.05) {
+    return {
+      type: "stable",
+      icon: "→",
+      title: "Estable",
+      detail: `Promedio sin cambios fuertes (${current.toFixed(1)}).`
+    };
+  }
+  return diff > 0
+    ? {
+        type: "up",
+        icon: "↑",
+        title: "Subiendo",
+        detail: `El último voto elevó el promedio a ${current.toFixed(1)}.`
+      }
+    : {
+        type: "down",
+        icon: "↓",
+        title: "Bajando",
+        detail: `El último voto bajó el promedio a ${current.toFixed(1)}.`
+      };
 }
 
 function displayView(session) {

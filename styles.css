@@ -519,9 +519,10 @@ fieldset {
 }
 
 .thermo.large {
-  grid-template-columns: auto 58px;
+  grid-template-columns: 24px 58px;
   grid-template-rows: 230px auto;
-  width: 132px;
+  width: 94px;
+  justify-self: start;
 }
 
 .thermo-scale {
@@ -531,6 +532,13 @@ fieldset {
   justify-content: space-between;
   color: var(--muted);
   font-size: 0.75rem;
+}
+
+.thermo.large .thermo-scale {
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 900;
+  text-align: right;
 }
 
 .thermo-track {
@@ -599,7 +607,79 @@ fieldset {
 }
 
 .results-side {
+  display: grid;
+  align-content: start;
+  gap: 14px;
   padding: 18px;
+}
+
+.trend-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+  border-radius: 8px;
+  padding: 14px;
+  color: #fff;
+  background: linear-gradient(135deg, #1f6fb2, #0b8f48);
+  box-shadow: 0 16px 36px rgba(24, 61, 45, 0.2);
+}
+
+.trend-card::after {
+  content: "";
+  position: absolute;
+  inset: -40% -20% auto auto;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.trend-card.up {
+  background: linear-gradient(135deg, #0b8f48, #80bd28);
+}
+
+.trend-card.down {
+  background: linear-gradient(135deg, #d92d20, #f28b2e);
+}
+
+.trend-card.stable {
+  background: linear-gradient(135deg, #1f6fb2, #0b8f48);
+}
+
+.trend-arrow {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 3.2rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.trend-card div {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.trend-card p,
+.trend-card small {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.86);
+  font-weight: 800;
+}
+
+.trend-card strong {
+  font-size: clamp(1.5rem, 3vw, 2.15rem);
+  line-height: 1;
 }
 
 .quiz-builder,
@@ -824,7 +904,7 @@ fieldset {
 
 .metric-card {
   display: inline-grid;
-  align-items: center;
+  align-items: start;
   min-height: 150px;
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 8px;
@@ -835,13 +915,15 @@ fieldset {
 
 .countdown {
   justify-items: center;
-  gap: 4px;
+  align-content: start;
+  gap: 10px;
 }
 
 .countdown span {
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 0.78rem;
-  font-weight: 800;
+  color: #fff;
+  font-size: clamp(1rem, 1.8vw, 1.28rem);
+  font-weight: 900;
+  text-align: center;
 }
 
 .countdown strong {
@@ -854,13 +936,28 @@ fieldset {
 }
 
 .average-card {
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 94px;
+  gap: 10px;
+  align-items: start;
+}
+
+.average-card > div {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  text-align: center;
 }
 
 .results-stage .eyebrow,
 .results-stage p {
   color: rgba(255, 255, 255, 0.84);
+}
+
+.results-stage .eyebrow {
+  color: #fff;
+  font-size: clamp(1rem, 1.8vw, 1.28rem);
+  font-weight: 900;
+  text-align: center;
 }
 
 .results-stage h1 {
