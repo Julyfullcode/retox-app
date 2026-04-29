@@ -609,6 +609,13 @@ fieldset {
   gap: 10px;
 }
 
+.quiz-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .scale-config {
   display: grid;
   gap: 12px;
@@ -670,21 +677,57 @@ fieldset {
 .answer-option {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
   color: var(--ink);
   font-weight: 700;
   min-width: 0;
-  white-space: normal;
+  white-space: nowrap;
+}
+
+.check-row input,
+.answer-option input {
+  width: auto;
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 .answer-option {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
+  text-align: left;
+}
+
+.answer-option span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.score-panel {
+  width: min(520px, 100%);
+  justify-self: center;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
 }
 
 .score-panel h1 {
   font-size: clamp(4rem, 15vw, 8rem);
+  margin: 0;
+}
+
+.score-mood {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--green-2) 24%, white);
+  font-size: 3rem;
+  box-shadow: 0 14px 34px rgba(11, 143, 72, 0.15);
 }
 
 .quiz-summary {
@@ -1190,8 +1233,7 @@ footer {
   padding: 0 12px;
 }
 
-.quiz-question .compact-button,
-.quiz-add-question {
+.quiz-actions .compact-button {
   width: 170px;
   justify-self: start;
 }

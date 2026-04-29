@@ -612,7 +612,7 @@ function hostSetupView() {
       ${roomHeader({ code: "Host" })}
       <section class="host-portal">
         <form class="panel setup-panel" data-action="createSessionForm">
-          <p class="eyebrow">Crear sesion</p>
+          <p class="eyebrow">Crear sesión</p>
           <h1>${appState.surveyType === "quiz" ? "Nuevo quiz" : "Nueva escala"}</h1>
           <input type="hidden" name="type" value="${appState.surveyType}" />
           ${
@@ -621,8 +621,7 @@ function hostSetupView() {
                   <div class="quiz-builder" id="quiz-builder">
                     ${quizQuestionTemplate(0)}
                   </div>
-                  <button class="secondary compact-button quiz-add-question" type="button" data-action="addQuizQuestion">Agregar pregunta</button>
-                  <label for="setup-duration">Tiempo maximo de vigencia en minutos</label>
+                  <label for="setup-duration">Tiempo máximo de vigencia en minutos</label>
                   <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                 </div>`
               : `<div class="scale-config">
@@ -630,17 +629,17 @@ function hostSetupView() {
                   <textarea id="setup-question" name="question" rows="3">${defaultQuestion}</textarea>
                   <div class="setup-inline-fields">
                     <label class="field" for="setup-scale-max">
-                      <span>Numero maximo de escala</span>
+                      <span>Número máximo de escala</span>
                       <input id="setup-scale-max" name="scaleMax" type="number" min="2" max="10" value="10" />
                     </label>
                     <label class="field" for="setup-duration">
-                      <span>Tiempo maximo de vigencia en minutos</span>
+                      <span>Tiempo máximo de vigencia en minutos</span>
                       <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                     </label>
                   </div>
                 </div>`
           }
-          <button class="primary full create-session-button" type="submit">Crear sesion</button>
+          <button class="primary full create-session-button" type="submit">Crear sesión</button>
         </form>
       </section>
       ${footer()}
@@ -711,7 +710,10 @@ function quizQuestionTemplate(index) {
       <div class="quiz-options">
         ${[0, 1, 2].map((optionIndex) => quizOptionTemplate(index, optionIndex)).join("")}
       </div>
-      <button class="secondary compact-button" type="button" data-action="addQuizOption">Agregar opcion</button>
+      <div class="quiz-actions">
+        <button class="secondary compact-button" type="button" data-action="addQuizOption">Agregar opción</button>
+        <button class="secondary compact-button" type="button" data-action="addQuizQuestion">Agregar pregunta</button>
+      </div>
     </div>
   `;
 }
@@ -719,7 +721,7 @@ function quizQuestionTemplate(index) {
 function quizOptionTemplate(questionIndex, optionIndex) {
   return `
     <div class="quiz-option">
-      <input name="quizOption-${questionIndex}" placeholder="Opcion ${optionIndex + 1}" />
+      <input name="quizOption-${questionIndex}" placeholder="Opción ${optionIndex + 1}" />
       <label class="check-row"><input type="checkbox" name="quizCorrect-${questionIndex}-${optionIndex}" /> Correcta</label>
       <input name="quizPoints-${questionIndex}-${optionIndex}" type="number" min="0" value="1" aria-label="Puntos" />
     </div>
@@ -730,7 +732,7 @@ function parseQuizForm(form) {
   return [...form.querySelectorAll(".quiz-question")].map((node, qIndex) => {
     const text = node.querySelector('[name="quizQuestion"]').value.trim();
     const options = [...node.querySelectorAll(".quiz-option")].map((optionNode, optionIndex) => ({
-      text: optionNode.querySelector(`[name="quizOption-${qIndex}"]`)?.value.trim() || `Opcion ${optionIndex + 1}`,
+      text: optionNode.querySelector(`[name="quizOption-${qIndex}"]`)?.value.trim() || `Opción ${optionIndex + 1}`,
       correct: Boolean(optionNode.querySelector(`[name="quizCorrect-${qIndex}-${optionIndex}"]`)?.checked),
       points: Number(optionNode.querySelector(`[name="quizPoints-${qIndex}-${optionIndex}"]`)?.value || 0)
     })).filter((option) => option.text);
@@ -873,10 +875,12 @@ function waitingView(session) {
   `;
 }
 
-function quizParticipantView(session) {
+function quizParticipantViewLegacy(session) {
   const voted = Boolean(session.votes[appState.user?.id]);
   const closed = isSessionClosed(session);
   const vote = session.votes[appState.user?.id];
+  const maxScore = maxQuizScore(session);
+  const mood = voted ? scoreMood(vote.score, maxScore) : null;
   return `
     <main class="app-grid">
       ${roomHeader(session)}
@@ -906,6 +910,55 @@ function quizParticipantView(session) {
       ${footer()}
     </main>
   `;
+}
+
+function quizParticipantView(session) {
+  const voted = Boolean(session.votes[appState.user?.id]);
+  const closed = isSessionClosed(session);
+  const vote = session.votes[appState.user?.id];
+  const maxScore = maxQuizScore(session);
+  const mood = voted ? scoreMood(vote.score, maxScore) : null;
+  return `
+    <main class="app-grid">
+      ${roomHeader(session)}
+      <section class="panel question-panel">
+        <p class="eyebrow">Quiz · ${closed ? "Cerrado" : `Tiempo restante ${formatRemaining(session)}`}</p>
+        <h1>${escapeHtml(session.question)}</h1>
+        <p>${session.quiz?.questions?.length || 0} preguntas · puntaje máximo ${maxScore}</p>
+      </section>
+      ${
+        voted
+          ? `<section class="panel score-panel">
+              <div class="score-mood" aria-hidden="true">${mood.icon}</div>
+              <p class="eyebrow">${mood.label}</p>
+              <h1>${vote.score}</h1>
+              <p>Sobre ${maxScore} puntos posibles</p>
+            </section>`
+          : `<form class="panel quiz-answer-form" data-action="quizSubmitForm">
+              ${(session.quiz?.questions || []).map((question, qIndex) => `
+                <fieldset class="quiz-answer-question">
+                  <legend>${escapeHtml(question.text)}</legend>
+                  ${question.options.map((option, optionIndex) => `
+                    <label class="answer-option">
+                      <input type="checkbox" name="q-${qIndex}" value="${optionIndex}" ${closed ? "disabled" : ""} />
+                      <span>${escapeHtml(option.text)}</span>
+                    </label>
+                  `).join("")}
+                </fieldset>
+              `).join("")}
+              <button class="primary full" type="submit" ${closed ? "disabled" : ""}>Enviar quiz</button>
+            </form>`
+      }
+      ${footer()}
+    </main>
+  `;
+}
+
+function scoreMood(score, maxScore) {
+  const ratio = maxScore ? Number(score || 0) / maxScore : 0;
+  if (ratio >= 0.8) return { icon: "😄", label: "Excelente resultado" };
+  if (ratio >= 0.5) return { icon: "🙂", label: "Buen resultado" };
+  return { icon: "😟", label: "Puedes mejorar" };
 }
 
 function hostView(session) {
