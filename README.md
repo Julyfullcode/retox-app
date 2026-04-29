@@ -50,12 +50,40 @@ create table if not exists public.retox_sessions (
   updated_at timestamptz default now()
 );
 
+create table if not exists public.retox_participants (
+  session_code text not null references public.retox_sessions(code) on delete cascade,
+  user_id text not null,
+  name text not null,
+  avatar text not null,
+  joined_at timestamptz default now(),
+  primary key (session_code, user_id)
+);
+
+create table if not exists public.retox_votes (
+  session_code text not null references public.retox_sessions(code) on delete cascade,
+  user_id text not null,
+  round integer not null default 1,
+  type text not null default 'scale',
+  value numeric,
+  answers jsonb,
+  score numeric,
+  voted_at timestamptz default now(),
+  primary key (session_code, user_id, round)
+);
+
 alter table public.retox_sessions enable row level security;
+alter table public.retox_participants enable row level security;
+alter table public.retox_votes enable row level security;
 
 drop policy if exists "Allow public read" on public.retox_sessions;
 drop policy if exists "Allow public insert" on public.retox_sessions;
 drop policy if exists "Allow public update" on public.retox_sessions;
 drop policy if exists "Allow public delete" on public.retox_sessions;
+drop policy if exists "Allow public read participants" on public.retox_participants;
+drop policy if exists "Allow public insert participants" on public.retox_participants;
+drop policy if exists "Allow public update participants" on public.retox_participants;
+drop policy if exists "Allow public read votes" on public.retox_votes;
+drop policy if exists "Allow public insert votes" on public.retox_votes;
 
 create policy "Allow public read"
 on public.retox_sessions
@@ -82,9 +110,54 @@ for delete
 to anon
 using (true);
 
+create policy "Allow public read participants"
+on public.retox_participants
+for select
+to anon
+using (true);
+
+create policy "Allow public insert participants"
+on public.retox_participants
+for insert
+to anon
+with check (true);
+
+create policy "Allow public update participants"
+on public.retox_participants
+for update
+to anon
+using (true)
+with check (true);
+
+create policy "Allow public read votes"
+on public.retox_votes
+for select
+to anon
+using (true);
+
+create policy "Allow public insert votes"
+on public.retox_votes
+for insert
+to anon
+with check (true);
+
 do $$
 begin
   alter publication supabase_realtime add table public.retox_sessions;
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.retox_participants;
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.retox_votes;
 exception
   when duplicate_object then null;
 end $$;

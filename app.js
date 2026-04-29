@@ -4,11 +4,14 @@ const broadcast = "BroadcastChannel" in window ? new BroadcastChannel("retox-rea
 const SUPABASE_URL = "https://oixqthwwjvvspsuwfhme.supabase.co";
 const SUPABASE_KEY = "sb_publishable_WaBBzhjih4wZiDGnnfprVw_zcp4Y63_";
 const SUPABASE_TABLE = "retox_sessions";
+const SUPABASE_PARTICIPANTS_TABLE = "retox_participants";
+const SUPABASE_VOTES_TABLE = "retox_votes";
 const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY) || null;
 let sessionCache = readLocalSessions();
 let realtimeChannel = null;
 let remoteReady = false;
 let remotePollInFlight = false;
+let remoteRefreshTimer = null;
 
 const avatars = [
   ["robot-bailarin", "Robot bailarin", "🤖", "#dff6ee"],
@@ -73,6 +76,72 @@ function saveLocalSessions(sessions) {
   window.dispatchEvent(new Event("retox:update"));
 }
 
+function sessionConfig(session) {
+  const { participants: _participants, votes: _votes, ...config } = session || {};
+  return config;
+}
+
+function participantFromRow(row) {
+  return {
+    id: row.user_id,
+    name: row.name,
+    avatar: row.avatar,
+    joinedAt: row.joined_at ? new Date(row.joined_at).getTime() : Date.now()
+  };
+}
+
+function voteFromRow(row) {
+  return {
+    value: row.value === null || row.value === undefined ? undefined : Number(row.value),
+    answers: row.answers || undefined,
+    score: row.score === null || row.score === undefined ? undefined : Number(row.score),
+    at: row.voted_at ? new Date(row.voted_at).getTime() : Date.now(),
+    round: row.round
+  };
+}
+
+function hydrateSession(config, participantRows = [], voteRows = []) {
+  if (!config) return null;
+  const round = Number(config.round || 1);
+  const legacyParticipants = config.participants || {};
+  const legacyVotes = Object.fromEntries(
+    Object.entries(config.votes || {}).filter(([, vote]) => Number(vote.round || round) === round)
+  );
+  const participants = {
+    ...legacyParticipants,
+    ...Object.fromEntries(participantRows.map((row) => [row.user_id, participantFromRow(row)]))
+  };
+  const votes = {
+    ...legacyVotes,
+    ...Object.fromEntries(
+      voteRows
+        .filter((row) => Number(row.round || 1) === round)
+        .map((row) => [row.user_id, voteFromRow(row)])
+    )
+  };
+  return { ...sessionConfig(config), participants, votes };
+}
+
+function saveSessionToCache(session) {
+  if (!session?.code) return;
+  sessionCache = { ...sessionCache, [session.code]: session };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionCache));
+  broadcast?.postMessage({ type: "sessions:update" });
+}
+
+function scheduleBundleRefresh(code) {
+  if (remoteRefreshTimer) return;
+  remoteRefreshTimer = setTimeout(async () => {
+    remoteRefreshTimer = null;
+    if (appState.code) {
+      await fetchSessionBundle(appState.code);
+    } else {
+      await loadRemoteSessions();
+    }
+    render();
+  }, 450);
+}
+
 async function loadRemoteSessions() {
   if (!supabaseClient) return false;
   const { data, error } = await supabaseClient.from(SUPABASE_TABLE).select("code,data");
@@ -80,27 +149,79 @@ async function loadRemoteSessions() {
     console.warn("Supabase no esta listo, usando almacenamiento local:", error.message);
     return false;
   }
-  sessionCache = Object.fromEntries((data || []).map((row) => [row.code, row.data]));
+  const sessions = Object.fromEntries((data || []).map((row) => [row.code, hydrateSession(row.data)]));
+  const codes = Object.keys(sessions);
+  if (codes.length) {
+    const [{ data: participants, error: participantsError }, { data: votes, error: votesError }] = await Promise.all([
+      supabaseClient.from(SUPABASE_PARTICIPANTS_TABLE).select("*").in("session_code", codes),
+      supabaseClient.from(SUPABASE_VOTES_TABLE).select("*").in("session_code", codes)
+    ]);
+    if (participantsError || votesError) {
+      console.warn("Faltan tablas escalables de Retox, usando datos de sesion:", participantsError?.message || votesError?.message);
+    } else {
+      Object.keys(sessions).forEach((code) => {
+        sessions[code] = hydrateSession(
+          sessions[code],
+          (participants || []).filter((row) => row.session_code === code),
+          (votes || []).filter((row) => row.session_code === code)
+        );
+      });
+    }
+  }
+  sessionCache = sessions;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionCache));
   remoteReady = true;
   return true;
 }
 
 async function fetchRemoteSession(code) {
+  return fetchSessionBundle(code);
+}
+
+async function fetchSessionConfig(code) {
   if (!supabaseClient) return null;
-  const { data, error } = await supabaseClient.from(SUPABASE_TABLE).select("code,data").eq("code", code).maybeSingle();
+  const normalized = String(code || "").toUpperCase();
+  const { data, error } = await supabaseClient.from(SUPABASE_TABLE).select("code,data").eq("code", normalized).maybeSingle();
+  if (error) {
+    console.warn("No pude consultar la sesion:", error.message);
+    return null;
+  }
+  if (!data) return null;
+  const current = getSession(data.code);
+  const session = hydrateSession({
+    ...data.data,
+    participants: current?.participants || data.data.participants,
+    votes: current?.votes || data.data.votes
+  });
+  saveSessionToCache(session);
+  return session;
+}
+
+async function fetchSessionBundle(code) {
+  if (!supabaseClient) return null;
+  const normalized = String(code || "").toUpperCase();
+  const { data, error } = await supabaseClient.from(SUPABASE_TABLE).select("code,data").eq("code", normalized).maybeSingle();
   if (error) {
     console.warn("No pude consultar Supabase:", error.message);
     return null;
   }
   if (!data) return null;
-  sessionCache = { ...sessionCache, [data.code]: data.data };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionCache));
-  return data.data;
+  const [{ data: participants, error: participantsError }, { data: votes, error: votesError }] = await Promise.all([
+    supabaseClient.from(SUPABASE_PARTICIPANTS_TABLE).select("*").eq("session_code", data.code),
+    supabaseClient.from(SUPABASE_VOTES_TABLE).select("*").eq("session_code", data.code)
+  ]);
+  if (participantsError || votesError) {
+    console.warn("No pude consultar participantes/votos:", participantsError?.message || votesError?.message);
+  }
+  const session = hydrateSession(data.data, participants || [], votes || []);
+  saveSessionToCache(session);
+  return session;
 }
 
 async function persistSession(session) {
-  const sessions = { ...sessionCache, [session.code]: session };
+  const current = getSession(session.code);
+  const cachedSession = hydrateSession({ ...session, participants: current?.participants, votes: current?.votes });
+  const sessions = { ...sessionCache, [session.code]: cachedSession };
   sessionCache = sessions;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
   broadcast?.postMessage({ type: "sessions:update" });
@@ -108,7 +229,7 @@ async function persistSession(session) {
   if (supabaseClient) {
     const { error } = await supabaseClient
       .from(SUPABASE_TABLE)
-      .upsert({ code: session.code, data: session, updated_at: new Date().toISOString() }, { onConflict: "code" });
+      .upsert({ code: session.code, data: sessionConfig(session), updated_at: new Date().toISOString() }, { onConflict: "code" });
     if (error) {
       remoteReady = false;
       console.warn("No pude guardar en Supabase, mantengo copia local:", error.message);
@@ -119,6 +240,98 @@ async function persistSession(session) {
   }
 
   window.dispatchEvent(new Event("retox:update"));
+}
+
+async function saveParticipant(code, user) {
+  const normalized = String(code || "").toUpperCase();
+  if (!normalized || !user?.id) return;
+  const current = getSession(normalized);
+  const existing = current?.participants?.[user.id];
+  const participant = { ...user, joinedAt: existing?.joinedAt || Date.now() };
+  saveSessionToCache(hydrateSession({
+    ...(current || { code: normalized, round: 1 }),
+    participants: { ...(current?.participants || {}), [user.id]: participant },
+    votes: current?.votes || {}
+  }));
+
+  if (!supabaseClient) {
+    window.dispatchEvent(new Event("retox:update"));
+    return;
+  }
+  const { error } = await supabaseClient
+    .from(SUPABASE_PARTICIPANTS_TABLE)
+    .upsert(
+      {
+        session_code: normalized,
+        user_id: user.id,
+        name: user.name,
+        avatar: user.avatar,
+        joined_at: existing?.joinedAt ? new Date(existing.joinedAt).toISOString() : new Date().toISOString()
+      },
+      { onConflict: "session_code,user_id" }
+    );
+  if (error) {
+    console.warn("No pude guardar participante:", error.message);
+    toast("No pude registrar el participante en Supabase.");
+  }
+  window.dispatchEvent(new Event("retox:update"));
+}
+
+async function saveScaleVote(code, user, value, round) {
+  return saveVoteRow(code, user, { type: "scale", value, round });
+}
+
+async function saveQuizVote(code, user, answers, score, round) {
+  return saveVoteRow(code, user, { type: "quiz", answers, score, round });
+}
+
+async function saveVoteRow(code, user, vote) {
+  const normalized = String(code || "").toUpperCase();
+  if (!normalized || !user?.id) return false;
+  const current = getSession(normalized);
+  const round = Number(vote.round || current?.round || 1);
+  if (current?.votes?.[user.id]) return false;
+  const localVote = {
+    value: vote.value,
+    answers: vote.answers,
+    score: vote.score,
+    at: Date.now(),
+    round
+  };
+
+  if (!supabaseClient) {
+    saveSessionToCache(hydrateSession({
+      ...(current || { code: normalized, round }),
+      participants: current?.participants || {},
+      votes: { ...(current?.votes || {}), [user.id]: localVote }
+    }));
+    window.dispatchEvent(new Event("retox:update"));
+    return true;
+  }
+
+  const { error } = await supabaseClient.from(SUPABASE_VOTES_TABLE).insert({
+    session_code: normalized,
+    user_id: user.id,
+    round,
+    type: vote.type,
+    value: vote.value ?? null,
+    answers: vote.answers || null,
+    score: vote.score ?? null,
+    voted_at: new Date().toISOString()
+  });
+  if (error) {
+    if (error.code === "23505") return false;
+    console.warn("No pude guardar voto:", error.message);
+    toast("No pude registrar el voto en Supabase.");
+    return false;
+  }
+  saveSessionToCache(hydrateSession({
+    ...(current || { code: normalized, round }),
+    participants: current?.participants || {},
+    votes: { ...(current?.votes || {}), [user.id]: localVote }
+  }));
+  window.dispatchEvent(new Event("retox:update"));
+  return true;
 }
 
 async function deleteSession(code) {
@@ -144,24 +357,36 @@ async function deleteSession(code) {
 
 function subscribeToRemoteSessions() {
   if (!supabaseClient || realtimeChannel) return;
+  const refreshChangedSession = async (payload) => {
+    const row = payload.new || payload.old;
+    const code = row?.code || row?.session_code;
+    if (!code) return;
+    if (payload.eventType === "DELETE" && row.code && !row.session_code) {
+      const { [code]: _removed, ...rest } = sessionCache;
+      sessionCache = rest;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionCache));
+      render();
+      return;
+    }
+    const isSessionRow = Boolean(row.code && !row.session_code);
+    const shouldHydrateFull = ["host", "display", "hostSetup", "admin"].includes(appState.view);
+    if (shouldHydrateFull && isSessionRow) {
+      await fetchSessionBundle(code);
+    } else if (shouldHydrateFull) {
+      scheduleBundleRefresh(code);
+      return;
+    } else if (isSessionRow && code === appState.code) {
+      await fetchSessionConfig(code);
+    } else {
+      return;
+    }
+    render();
+  };
   realtimeChannel = supabaseClient
     .channel("retox-sessions")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: SUPABASE_TABLE },
-      (payload) => {
-        const row = payload.new || payload.old;
-        if (!row?.code) return;
-        if (payload.eventType === "DELETE") {
-          const { [row.code]: _removed, ...rest } = sessionCache;
-          sessionCache = rest;
-        } else {
-          sessionCache = { ...sessionCache, [row.code]: row.data };
-        }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionCache));
-        render();
-      }
-    )
+    .on("postgres_changes", { event: "*", schema: "public", table: SUPABASE_TABLE }, refreshChangedSession)
+    .on("postgres_changes", { event: "*", schema: "public", table: SUPABASE_PARTICIPANTS_TABLE }, refreshChangedSession)
+    .on("postgres_changes", { event: "*", schema: "public", table: SUPABASE_VOTES_TABLE }, refreshChangedSession)
     .subscribe();
 }
 
@@ -217,7 +442,7 @@ async function joinSession(code) {
     toast("Ingresa el codigo de la sesion.");
     return;
   }
-  const session = getSession(normalized) || await fetchRemoteSession(normalized);
+  const session = getSession(normalized) || await fetchSessionConfig(normalized);
   if (!session) {
     toast("No encuentro esa sesion. Revisa el codigo.");
     return;
@@ -228,13 +453,7 @@ async function joinSession(code) {
 }
 
 async function addParticipant(code, user) {
-  await upsertSession(code, (session) => ({
-    ...session,
-    participants: {
-      ...session.participants,
-      [user.id]: { ...user, joinedAt: session.participants[user.id]?.joinedAt || Date.now() }
-    }
-  }));
+  await saveParticipant(code, user);
 }
 
 async function submitIdentity(event) {
@@ -256,7 +475,7 @@ async function submitIdentity(event) {
 
 async function vote(value) {
   if (!appState.user) return;
-  const current = await fetchRemoteSession(appState.code) || getSession(appState.code);
+  const current = await fetchSessionConfig(appState.code) || getSession(appState.code);
   if (isSessionClosed(current)) {
     toast("La votacion ya esta cerrada.");
     render();
@@ -267,21 +486,15 @@ async function vote(value) {
     render();
     return;
   }
-  await upsertSession(appState.code, (session) => ({
-    ...session,
-    votes: {
-      ...session.votes,
-      [appState.user.id]: { value, at: Date.now(), round: session.round }
-    }
-  }));
-  toast(`Voto enviado: ${value}`);
+  const saved = await saveScaleVote(appState.code, appState.user, value, current.round);
+  toast(saved ? `Voto enviado: ${value}` : "Tu voto ya quedo registrado.");
   render();
 }
 
 async function submitQuiz(event) {
   event.preventDefault();
   if (!appState.user) return;
-  const current = await fetchRemoteSession(appState.code) || getSession(appState.code);
+  const current = await fetchSessionConfig(appState.code) || getSession(appState.code);
   if (isSessionClosed(current)) {
     toast("El quiz ya esta cerrado.");
     render();
@@ -298,14 +511,8 @@ async function submitQuiz(event) {
     answers[qIndex] = form.getAll(`q-${qIndex}`).map(Number);
   });
   const score = scoreQuiz(current, answers);
-  await upsertSession(appState.code, (session) => ({
-    ...session,
-    votes: {
-      ...session.votes,
-      [appState.user.id]: { answers, score, at: Date.now(), round: session.round }
-    }
-  }));
-  toast(`Quiz enviado. Puntaje: ${score}`);
+  const saved = await saveQuizVote(appState.code, appState.user, answers, score, current.round);
+  toast(saved ? `Quiz enviado. Puntaje: ${score}` : "Tu quiz ya fue enviado.");
   render();
 }
 
@@ -316,7 +523,7 @@ async function resetVotes() {
       ? [{ question: session.question, average: stats.average, count: stats.count, at: Date.now() }, ...session.history].slice(0, 8)
       : session.history;
     const now = Date.now();
-    return { ...session, votes: {}, history, round: session.round + 1, expiresAt: now + (session.durationMinutes || 10) * 60 * 1000 };
+    return { ...session, history, round: session.round + 1, expiresAt: now + (session.durationMinutes || 10) * 60 * 1000 };
   });
 }
 
@@ -329,16 +536,17 @@ async function updateQuestion(event) {
 }
 
 async function addDemoVotes() {
-  await upsertSession(appState.code, (session) => {
-    const participants = { ...session.participants };
-    const votes = { ...session.votes };
-    sampleNames.forEach((name, index) => {
-      const id = `demo-${index}`;
-      participants[id] ||= { id, name, avatar: avatars[(index + 3) % avatars.length][0], joinedAt: Date.now() };
-      votes[id] = { value: Math.ceil(Math.random() * 10), at: Date.now(), round: session.round };
-    });
-    return { ...session, participants, votes };
-  });
+  const session = await fetchSessionBundle(appState.code) || getSession(appState.code);
+  if (!session) return;
+  await Promise.all(sampleNames.map(async (name, index) => {
+    const user = { id: `demo-${index}`, name, avatar: avatars[(index + 3) % avatars.length][0] };
+    await saveParticipant(appState.code, user);
+    if (!session.votes?.[user.id]) {
+      await saveScaleVote(appState.code, user, Math.ceil(Math.random() * Number(session.scaleMax || 10)), session.round);
+    }
+  }));
+  await fetchSessionBundle(appState.code);
+  render();
 }
 
 function appBaseUrl() {
@@ -1440,7 +1648,7 @@ initApp();
 setInterval(async () => {
   const focused = document.activeElement;
   const isEditing = focused && ["INPUT", "TEXTAREA", "SELECT"].includes(focused.tagName);
-  const shouldSync = appState.code && ["host", "waiting", "display", "invite"].includes(appState.view);
+  const shouldSync = appState.code && ["host", "display"].includes(appState.view);
   if (shouldSync && !remotePollInFlight) {
     remotePollInFlight = true;
     try {
