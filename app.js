@@ -982,7 +982,6 @@ function hostView(session) {
             <input class="share-link" readonly value="${links.participant}" aria-label="Link de invitacion" />
             <button class="secondary copy-button" data-copy-url="${links.participant}">Copiar URL</button>
           </div>
-          ${qrBlock(links.participant, "QR participantes", 180, links.invite)}
         </section>
         <section class="panel">
           <form data-action="questionForm">

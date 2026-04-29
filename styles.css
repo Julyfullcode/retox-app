@@ -459,6 +459,7 @@ fieldset {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 900;
 }
 
 .edit-person {
@@ -519,9 +520,9 @@ fieldset {
 }
 
 .thermo.large {
-  grid-template-columns: 24px 58px;
-  grid-template-rows: 230px auto;
-  width: 94px;
+  grid-template-columns: 24px 64px;
+  grid-template-rows: 248px auto;
+  width: 104px;
   justify-self: start;
 }
 
@@ -545,13 +546,20 @@ fieldset {
   position: relative;
   height: 100%;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 2px solid rgba(255, 255, 255, 0.9);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.28);
+  background: linear-gradient(0deg, #0b8f48 0%, #80bd28 35%, #ffd84d 50%, #f28b2e 68%, #d92d20 100%);
 }
 
 .thermo-track::after {
-  display: none;
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(100% - var(--level));
+  border-radius: 999px 999px 0 0;
+  background: rgba(255, 255, 255, 0.88);
+  transition: height 0.45s ease;
+  z-index: 2;
 }
 
 .thermo-fill {
@@ -561,8 +569,9 @@ fieldset {
   left: 0;
   height: var(--level);
   border-radius: 999px;
-  background: linear-gradient(0deg, #0b8f48 0%, #80bd28 35%, #ffd84d 50%, #f28b2e 68%, #d92d20 100%);
+  background: transparent;
   transition: height 0.45s ease;
+  z-index: 1;
 }
 
 .thermo-value {
@@ -581,14 +590,14 @@ fieldset {
   grid-template-columns: repeat(10, minmax(0, 1fr));
   align-items: end;
   gap: 6px;
-  min-height: 150px;
+  min-height: 184px;
 }
 
 .bar-wrap {
   display: grid;
   grid-template-rows: auto 1fr auto;
   align-items: end;
-  height: 150px;
+  height: 184px;
   gap: 6px;
 }
 
@@ -603,6 +612,7 @@ fieldset {
   display: grid;
   align-content: start;
   gap: 14px;
+  min-height: 304px;
   padding: 18px;
 }
 
@@ -614,6 +624,7 @@ fieldset {
   gap: 12px;
   overflow: hidden;
   border-radius: 8px;
+  min-height: 126px;
   padding: 14px;
   color: #fff;
   background: linear-gradient(135deg, #1f6fb2, #0b8f48);
@@ -952,7 +963,7 @@ fieldset {
 }
 
 .average-card {
-  grid-template-columns: minmax(0, 1fr) 94px;
+  grid-template-columns: minmax(0, 1fr) 104px;
   gap: 10px;
   align-items: start;
 }
@@ -962,6 +973,7 @@ fieldset {
   justify-items: center;
   align-content: start;
   text-align: center;
+  padding-top: 18px;
 }
 
 .results-stage .eyebrow,
@@ -977,7 +989,8 @@ fieldset {
 }
 
 .results-stage h1 {
-  font-size: clamp(3rem, 10vw, 6rem);
+  margin-top: 8px;
+  font-size: clamp(3.7rem, 11vw, 7rem);
 }
 
 .live-voters {
