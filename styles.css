@@ -521,7 +521,7 @@ fieldset {
 
 .thermo.large {
   grid-template-columns: 24px 64px;
-  grid-template-rows: 248px auto;
+  grid-template-rows: 190px auto;
   width: 104px;
   justify-self: start;
 }
@@ -857,10 +857,10 @@ fieldset {
   display: grid;
   grid-template-columns: 1fr;
   align-items: center;
-  gap: 12px;
-  min-height: 304px;
+  gap: 8px;
+  min-height: 248px;
   border-radius: 8px;
-  padding: clamp(14px, 3vw, 28px);
+  padding: clamp(12px, 2.2vw, 20px);
   background:
     linear-gradient(135deg, rgba(11, 143, 72, 0.94), rgba(31, 111, 178, 0.9)),
     var(--green);
@@ -871,7 +871,7 @@ fieldset {
 .live-question {
   grid-column: 1 / -1;
   max-width: 860px;
-  margin: 0 auto 10px;
+  margin: 0 auto 4px;
   color: #fff;
   font-size: clamp(1.25rem, 2.4vw, 2rem);
   line-height: 1.18;
@@ -881,25 +881,25 @@ fieldset {
 .live-metrics {
   display: grid;
   grid-template-columns: minmax(170px, 0.45fr) minmax(0, 1fr);
-  gap: 12px;
+  gap: 10px;
   width: 100%;
 }
 
 .metric-card {
   display: inline-grid;
   align-items: start;
-  min-height: 150px;
+  min-height: 128px;
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.14);
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.12);
-  padding: 14px;
+  padding: 12px;
 }
 
 .countdown {
   justify-items: center;
   align-content: start;
-  gap: 10px;
+  gap: 6px;
 }
 
 .countdown span {
@@ -911,21 +911,21 @@ fieldset {
 
 .countdown strong {
   color: #fff;
-  font-size: clamp(1.9rem, 5vw, 3.4rem);
+  font-size: clamp(1.8rem, 4.4vw, 3rem);
 }
 
 .live-qr {
   display: grid;
   justify-items: center;
-  gap: 6px;
+  gap: 4px;
   color: #fff;
   text-decoration: none;
 }
 
 .live-qr img {
-  width: 92px;
-  height: 92px;
-  border: 6px solid #fff;
+  width: 76px;
+  height: 76px;
+  border: 5px solid #fff;
   border-radius: 8px;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
 }
@@ -952,7 +952,7 @@ fieldset {
   justify-items: center;
   align-content: start;
   text-align: center;
-  padding-top: 18px;
+  padding-top: 10px;
 }
 
 .results-stage .eyebrow,
@@ -968,8 +968,8 @@ fieldset {
 }
 
 .results-stage h1 {
-  margin-top: 8px;
-  font-size: clamp(3.7rem, 11vw, 7rem);
+  margin-top: 2px;
+  font-size: clamp(3.2rem, 9vw, 5.8rem);
 }
 
 .live-voters {
