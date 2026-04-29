@@ -1,4 +1,5 @@
 const STORAGE_KEY = "retox.sessions.v1";
+const DELETED_SESSIONS_KEY = "retox.deletedSessions.v1";
 const ACTIVE_USER_KEY = "retox.activeUser.v1";
 const broadcast = "BroadcastChannel" in window ? new BroadcastChannel("retox-realtime") : null;
 const SUPABASE_URL = "https://oixqthwwjvvspsuwfhme.supabase.co";
@@ -59,10 +60,36 @@ function sessionCode() {
 
 function readLocalSessions() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+    return filterDeletedSessions(JSON.parse(localStorage.getItem(STORAGE_KEY)) || {});
   } catch {
     return {};
   }
+}
+
+function readDeletedSessions() {
+  try {
+    return JSON.parse(localStorage.getItem(DELETED_SESSIONS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function markSessionDeleted(code) {
+  const normalized = String(code || "").toUpperCase();
+  if (!normalized) return;
+  localStorage.setItem(DELETED_SESSIONS_KEY, JSON.stringify({
+    ...readDeletedSessions(),
+    [normalized]: Date.now()
+  }));
+}
+
+function isSessionDeletedLocally(code) {
+  return Boolean(readDeletedSessions()[String(code || "").toUpperCase()]);
+}
+
+function filterDeletedSessions(sessions) {
+  const deleted = readDeletedSessions();
+  return Object.fromEntries(Object.entries(sessions || {}).filter(([code]) => !deleted[String(code).toUpperCase()]));
 }
 
 function loadSessions() {
@@ -70,8 +97,8 @@ function loadSessions() {
 }
 
 function saveLocalSessions(sessions) {
-  sessionCache = sessions;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  sessionCache = filterDeletedSessions(sessions);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionCache));
   broadcast?.postMessage({ type: "sessions:update" });
   window.dispatchEvent(new Event("retox:update"));
 }
@@ -124,6 +151,7 @@ function hydrateSession(config, participantRows = [], voteRows = []) {
 
 function saveSessionToCache(session) {
   if (!session?.code) return;
+  if (isSessionDeletedLocally(session.code)) return;
   sessionCache = { ...sessionCache, [session.code]: session };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionCache));
   broadcast?.postMessage({ type: "sessions:update" });
@@ -168,7 +196,7 @@ async function loadRemoteSessions() {
       });
     }
   }
-  sessionCache = sessions;
+  sessionCache = filterDeletedSessions(sessions);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionCache));
   remoteReady = true;
   return true;
@@ -181,6 +209,7 @@ async function fetchRemoteSession(code) {
 async function fetchSessionConfig(code) {
   if (!supabaseClient) return null;
   const normalized = String(code || "").toUpperCase();
+  if (isSessionDeletedLocally(normalized)) return null;
   const { data, error } = await supabaseClient.from(SUPABASE_TABLE).select("code,data").eq("code", normalized).maybeSingle();
   if (error) {
     console.warn("No pude consultar la sesion:", error.message);
@@ -200,6 +229,7 @@ async function fetchSessionConfig(code) {
 async function fetchSessionBundle(code) {
   if (!supabaseClient) return null;
   const normalized = String(code || "").toUpperCase();
+  if (isSessionDeletedLocally(normalized)) return null;
   const { data, error } = await supabaseClient.from(SUPABASE_TABLE).select("code,data").eq("code", normalized).maybeSingle();
   if (error) {
     console.warn("No pude consultar Supabase:", error.message);
@@ -219,6 +249,7 @@ async function fetchSessionBundle(code) {
 }
 
 async function persistSession(session) {
+  if (isSessionDeletedLocally(session?.code)) return;
   const current = getSession(session.code);
   const cachedSession = hydrateSession({ ...session, participants: current?.participants, votes: current?.votes });
   const sessions = { ...sessionCache, [session.code]: cachedSession };
@@ -336,23 +367,43 @@ async function saveVoteRow(code, user, vote) {
 }
 
 async function deleteSession(code) {
-  if (!code) return;
-  if (!confirm(`Eliminar definitivamente la encuesta ${code}?`)) return;
-  const { [code]: _removed, ...rest } = sessionCache;
+  const normalized = String(code || "").toUpperCase();
+  if (!normalized) return;
+  if (!confirm(`Eliminar definitivamente la encuesta ${normalized}?`)) return;
+  markSessionDeleted(normalized);
+  const { [normalized]: _removed, ...rest } = sessionCache;
   sessionCache = rest;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionCache));
+  broadcast?.postMessage({ type: "sessions:update" });
 
   if (supabaseClient) {
-    const { error } = await supabaseClient.from(SUPABASE_TABLE).delete().eq("code", code);
+    const { data, error } = await supabaseClient.from(SUPABASE_TABLE).delete().eq("code", normalized).select("code");
     if (error) {
       toast("No pude eliminar en Supabase. Revisa permisos delete.");
       console.warn("Error eliminando encuesta:", error.message);
+      render();
+      return;
+    }
+    if (!data?.length) {
+      const stillThere = await supabaseClient.from(SUPABASE_TABLE).select("code").eq("code", normalized).maybeSingle();
+      if (stillThere.data) {
+        toast("La encuesta sigue en Supabase. Revisa permisos delete.");
+        render();
+        return;
+      }
+    }
+    const verify = await supabaseClient.from(SUPABASE_TABLE).select("code").eq("code", normalized).maybeSingle();
+    if (verify.data) {
+      toast("La encuesta sigue en Supabase. No se elimino definitivamente.");
+      render();
+      return;
     } else {
       toast("Encuesta eliminada.");
     }
   } else {
     toast("Encuesta eliminada localmente.");
   }
+  window.dispatchEvent(new Event("retox:update"));
   render();
 }
 
@@ -362,6 +413,7 @@ function subscribeToRemoteSessions() {
     const row = payload.new || payload.old;
     const code = row?.code || row?.session_code;
     if (!code) return;
+    if (isSessionDeletedLocally(code)) return;
     if (payload.eventType === "DELETE" && row.code && !row.session_code) {
       const { [code]: _removed, ...rest } = sessionCache;
       sessionCache = rest;
