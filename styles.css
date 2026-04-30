@@ -669,9 +669,53 @@ fieldset {
 
 .quiz-builder,
 .quiz-options,
-.quiz-answer-form {
+.quiz-answer-form,
+.wordcloud-form {
   display: grid;
   gap: 10px;
+}
+
+.wordcloud-side {
+  min-width: 0;
+  justify-items: center;
+}
+
+.word-cloud-shape {
+  position: relative;
+  width: 100%;
+  max-width: 390px;
+  aspect-ratio: 1.14;
+  min-height: 380px;
+  margin-inline: auto;
+  overflow: hidden;
+  border-radius: 36% 48% 42% 52% / 42% 38% 54% 48%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(31, 111, 178, 0.08), transparent 62%),
+    color-mix(in srgb, var(--card) 96%, transparent);
+  clip-path: polygon(15% 39%, 22% 26%, 35% 21%, 46% 10%, 61% 12%, 71% 23%, 84% 27%, 93% 41%, 88% 57%, 75% 66%, 70% 81%, 53% 84%, 43% 74%, 28% 77%, 16% 67%, 7% 54%);
+}
+
+.word-cloud-shape span {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  max-width: min(72%, 280px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--c);
+  font-size: clamp(0.72rem, var(--s), 3.5rem);
+  font-weight: 900;
+  line-height: 0.9;
+  white-space: nowrap;
+  transform: translate(-50%, -50%) rotate(var(--r));
+  transform-origin: center;
+}
+
+.word-cloud-shape.empty {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-weight: 900;
 }
 
 .quiz-actions {
@@ -1241,6 +1285,10 @@ footer {
 
 .host-card-art.quiz {
   background: linear-gradient(135deg, #b6e23a, #1f6fb2);
+}
+
+.host-card-art.wordcloud {
+  background: linear-gradient(135deg, #d12aa6, #1f6fb2);
 }
 
 .back-button {

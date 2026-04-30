@@ -316,6 +316,10 @@ async function saveQuizVote(code, user, answers, score, round) {
   return saveVoteRow(code, user, { type: "quiz", answers, score, round });
 }
 
+async function saveWordCloudVote(code, user, text, round) {
+  return saveVoteRow(code, user, { type: "wordcloud", answers: { text, words: extractWords(text) }, round });
+}
+
 async function saveVoteRow(code, user, vote) {
   const normalized = String(code || "").toUpperCase();
   if (!normalized || !user?.id) return false;
@@ -469,7 +473,7 @@ async function createSession(options = {}) {
   const code = sessionCode();
   const now = Date.now();
   const durationMinutes = Math.max(1, Number(options.durationMinutes || 10));
-  const type = options.type === "quiz" ? "quiz" : "scale";
+  const type = ["quiz", "wordcloud"].includes(options.type) ? options.type : "scale";
   const session = {
     code,
     createdAt: now,
@@ -477,6 +481,7 @@ async function createSession(options = {}) {
     question: String(options.question || defaultQuestion).trim() || defaultQuestion,
     scaleMax: Math.max(2, Math.min(10, Number(options.scaleMax || 10))),
     quiz: type === "quiz" ? { questions: options.questions || [] } : null,
+    wordCloud: type === "wordcloud" ? { maxWords: 3 } : null,
     durationMinutes,
     expiresAt: now + durationMinutes * 60 * 1000,
     participants: {},
@@ -569,6 +574,30 @@ async function submitQuiz(event) {
   render();
 }
 
+async function submitWordCloud(event) {
+  event.preventDefault();
+  if (!appState.user) return;
+  const current = await fetchSessionConfig(appState.code) || getSession(appState.code);
+  if (isSessionClosed(current)) {
+    toast("La nube ya está cerrada.");
+    render();
+    return;
+  }
+  if (current.votes?.[appState.user.id]) {
+    toast("Tu respuesta ya fue enviada.");
+    render();
+    return;
+  }
+  const text = String(new FormData(event.target).get("wordcloudAnswer") || "").trim();
+  if (!extractWords(text).length) {
+    toast("Escribe una palabra o frase corta.");
+    return;
+  }
+  const saved = await saveWordCloudVote(appState.code, appState.user, text, current.round);
+  toast(saved ? "Respuesta enviada." : "Tu respuesta ya fue enviada.");
+  render();
+}
+
 async function resetVotes() {
   await upsertSession(appState.code, (session) => {
     const stats = computeStats(session);
@@ -595,7 +624,12 @@ async function addDemoVotes() {
     const user = { id: `demo-${index}`, name, avatar: avatars[(index + 3) % avatars.length][0] };
     await saveParticipant(appState.code, user);
     if (!session.votes?.[user.id]) {
-      await saveScaleVote(appState.code, user, Math.ceil(Math.random() * Number(session.scaleMax || 10)), session.round);
+      if (session.type === "wordcloud") {
+        const samples = ["experiencia digital", "servicio cercano", "social media", "innovación cliente", "confianza", "rapidez"];
+        await saveWordCloudVote(appState.code, user, samples[index % samples.length], session.round);
+      } else {
+        await saveScaleVote(appState.code, user, Math.ceil(Math.random() * Number(session.scaleMax || 10)), session.round);
+      }
     }
   }));
   await fetchSessionBundle(appState.code);
@@ -642,6 +676,7 @@ function exportSessionResults(session) {
       participant.name,
       avatar[1],
       session.type === "quiz" ? vote?.score ?? "" : vote?.value ?? "",
+      session.type === "wordcloud" ? vote?.answers?.text ?? "" : "",
       vote?.at ? new Date(vote.at).toLocaleString("es-CO") : "",
       session.question,
       session.code,
@@ -656,14 +691,14 @@ function exportSessionResults(session) {
         ["Retox - Resultados de encuesta"],
         ["Vicepresidencia Experiencia Usuario Cliente - Grupo EPM"],
         ["Codigo", session.code],
-        ["Tipo", session.type === "quiz" ? "Quiz" : "Escala"],
+        ["Tipo", surveyTypeLabel(session.type)],
         ["Pregunta", session.question],
-        [session.type === "quiz" ? "Promedio puntos" : "Promedio", stats.count ? stats.average.toFixed(2) : ""],
+        [session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" ? "Respuestas" : "Promedio", stats.count ? stats.average.toFixed(2) : ""],
         ["Participantes", participants.length],
         ["Respuestas", stats.count],
         ...(session.type === "quiz" ? [["Puntaje maximo", stats.maxScore]] : []),
         [],
-        ["Nombre", "Avatar", session.type === "quiz" ? "Puntaje" : "Voto", "Fecha respuesta", "Pregunta", "Codigo sesion", "Ronda"],
+        ["Nombre", "Avatar", session.type === "quiz" ? "Puntaje" : "Voto", "Texto nube", "Fecha respuesta", "Pregunta", "Codigo sesion", "Ronda"],
         ...rows
       ]
     },
@@ -675,6 +710,9 @@ function exportSessionResults(session) {
           question.options.map((option) => [question.text, option.text, option.correct ? "Si" : "No", option.points])
         )
       ]
+    }] : session.type === "wordcloud" ? [{
+      name: "Nube",
+      rows: [["Palabra", "Cantidad"], ...(stats.words || []).map((word) => [word.text, word.count])]
     }] : [{
       name: "Distribucion",
       rows: [["Valor", "Cantidad"], ...distributionRows]
@@ -707,6 +745,12 @@ function exportResults() {
   exportSessionResults(getSession(appState.code));
 }
 
+function surveyTypeLabel(type) {
+  if (type === "quiz") return "Quiz";
+  if (type === "wordcloud") return "Nube de palabras";
+  return "Escala";
+}
+
 function excelWorkbook(sheets) {
   const sheetHtml = sheets
     .map(
@@ -729,6 +773,7 @@ function excelWorkbook(sheets) {
 }
 
 function computeStats(session) {
+  if (session?.type === "wordcloud") return computeWordCloudStats(session);
   if (session?.type === "quiz") return computeQuizStats(session);
   const values = Object.values(session?.votes || {}).map((vote) => Number(vote.value));
   const count = values.length;
@@ -759,6 +804,33 @@ function computeQuizStats(session) {
   const scores = votes.map((vote) => Number(vote.score || 0));
   const average = count ? scores.reduce((sum, score) => sum + score, 0) / count : 0;
   return { average, count, distribution: [], max: 1, maxScore: maxQuizScore(session), scores };
+}
+
+function extractWords(text) {
+  const stopWords = new Set(["de", "del", "la", "las", "el", "los", "y", "o", "a", "en", "un", "una", "por", "para", "con", "que", "es", "son"]);
+  return String(text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9ñ\s]/g, " ")
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter((word) => word.length > 2 && !stopWords.has(word))
+    .slice(0, 8);
+}
+
+function computeWordCloudStats(session) {
+  const votes = Object.values(session?.votes || {});
+  const counts = new Map();
+  votes.forEach((vote) => {
+    const words = vote.answers?.words?.length ? vote.answers.words : extractWords(vote.answers?.text || "");
+    words.forEach((word) => counts.set(word, (counts.get(word) || 0) + 1));
+  });
+  const words = [...counts.entries()]
+    .map(([text, count]) => ({ text, count }))
+    .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text))
+    .slice(0, 34);
+  return { average: votes.length, count: votes.length, distribution: [], max: Math.max(1, ...words.map((word) => word.count)), words };
 }
 
 function remainingMs(session) {
@@ -875,7 +947,7 @@ function hostSetupView() {
       <section class="host-portal">
         <form class="panel setup-panel" data-action="createSessionForm">
           <p class="eyebrow">Crear sesión</p>
-          <h1>${appState.surveyType === "quiz" ? "Nuevo quiz" : "Nueva escala"}</h1>
+          <h1>${appState.surveyType === "quiz" ? "Nuevo quiz" : appState.surveyType === "wordcloud" ? "Nueva nube de palabras" : "Nueva escala"}</h1>
           <input type="hidden" name="type" value="${appState.surveyType}" />
           ${
             appState.surveyType === "quiz"
@@ -886,7 +958,14 @@ function hostSetupView() {
                   <label for="setup-duration">Tiempo máximo de vigencia en minutos</label>
                   <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                 </div>`
-              : `<div class="scale-config">
+              : appState.surveyType === "wordcloud"
+                ? `<div class="scale-config">
+                    <label for="setup-question">Pregunta</label>
+                    <textarea id="setup-question" name="question" rows="3">Escribe una palabra o frase corta que represente esta experiencia</textarea>
+                    <label for="setup-duration">Tiempo máximo de vigencia en minutos</label>
+                    <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
+                  </div>`
+                : `<div class="scale-config">
                   <label for="setup-question">Pregunta</label>
                   <textarea id="setup-question" name="question" rows="3">${defaultQuestion}</textarea>
                   <div class="setup-inline-fields">
@@ -914,7 +993,7 @@ function hostMenuView() {
     <main class="admin-layout">
       ${roomHeader({ code: "Host" })}
       <section class="host-menu">
-        ${hostActionCard("create", "Crear encuesta", "Configura una escala o un quiz para compartir en vivo.", "chart")}
+        ${hostActionCard("create", "Crear encuesta", "Configura escala, quiz o nube de palabras para compartir en vivo.", "chart")}
         ${hostActionCard("history", "Historial", "Consulta resultados, QR, enlaces, Excel y elimina encuestas.", "archive")}
       </section>
       ${footer()}
@@ -929,6 +1008,7 @@ function surveyTypeChoiceView() {
       <section class="host-menu">
         ${hostActionCard("scale", "Escala", "Votacion numerica del 1 al 10 con promedio y distribucion.", "scale")}
         ${hostActionCard("quiz", "Quiz", "Preguntas con respuestas correctas, puntos y puntaje final.", "quiz")}
+        ${hostActionCard("wordcloud", "Nube de palabras", "Respuestas abiertas que forman una figura según frecuencia.", "wordcloud")}
       </section>
       ${footer()}
     </main>
@@ -956,6 +1036,9 @@ function hostCardSvg(icon) {
   }
   if (icon === "scale") {
     return `<svg viewBox="0 0 120 120"><path d="M24 84h72"/><path d="M32 74l15-20 18 11 24-30"/><circle cx="47" cy="54" r="6"/><circle cx="65" cy="65" r="6"/><circle cx="89" cy="35" r="6"/></svg>`;
+  }
+  if (icon === "wordcloud") {
+    return `<svg viewBox="0 0 120 120"><path d="M38 78h50a18 18 0 0 0 2-36 25 25 0 0 0-48-8 22 22 0 0 0-4 44Z"/><path d="M39 56h42M49 68h28M54 44h18"/></svg>`;
   }
   return `<svg viewBox="0 0 120 120"><rect x="24" y="28" width="72" height="58" rx="12"/><path d="M40 68h12M58 68h12M76 68h12M40 50h12M58 50h12M76 50h12"/></svg>`;
 }
@@ -1040,12 +1123,16 @@ function adminView() {
 function adminSessionRow(session) {
   const stats = computeStats(session);
   const links = sessionLinks(session.code);
+  const typeLabel = surveyTypeLabel(session.type);
+  const metricValue = session.type === "wordcloud"
+    ? `${stats.count} respuestas`
+    : `${stats.count ? stats.average.toFixed(1) : "--"}${session.type === "quiz" ? " pts" : ""}`;
   return `
     <div class="admin-row">
       <strong>${escapeHtml(session.code)}</strong>
-      <span><b>${session.type === "quiz" ? "Quiz" : "Escala"}</b> · ${escapeHtml(session.question)}</span>
+      <span><b>${typeLabel}</b> - ${escapeHtml(session.question)}</span>
       <span>${stats.count}</span>
-      <span>${stats.count ? stats.average.toFixed(1) : "--"}${session.type === "quiz" ? " pts" : ""}</span>
+      <span>${metricValue}</span>
       <span class="admin-links">
         <a href="${links.host}" target="_blank" rel="noreferrer">Resultados</a>
         <a href="${links.participant}" target="_blank" rel="noreferrer">Participantes</a>
@@ -1105,6 +1192,7 @@ function avatarOption(id, label, icon, color, checked) {
 }
 
 function waitingView(session) {
+  if (session.type === "wordcloud") return wordCloudParticipantView(session);
   if (session.type === "quiz") return quizParticipantView(session);
   const stats = computeStats(session);
   const voted = Boolean(session.votes[appState.user?.id]);
@@ -1132,6 +1220,32 @@ function waitingView(session) {
           ${histogram(stats)}
         </div>
       </section>
+      ${footer()}
+    </main>
+  `;
+}
+
+function wordCloudParticipantView(session) {
+  const voted = Boolean(session.votes[appState.user?.id]);
+  const closed = isSessionClosed(session);
+  const vote = session.votes[appState.user?.id];
+  return `
+    <main class="app-grid">
+      ${roomHeader(session)}
+      <section class="panel question-panel">
+        <p class="eyebrow">Nube de palabras · ${closed ? "Cerrada" : `Tiempo restante ${formatRemaining(session)}`}</p>
+        <h1>${escapeHtml(session.question)}</h1>
+        <p>${Object.keys(session.votes || {}).length} respuestas recibidas</p>
+      </section>
+      ${
+        voted
+          ? `<section class="panel compact"><strong>Tu respuesta quedó registrada</strong><p>${escapeHtml(vote.answers?.text || "")}</p></section>`
+          : `<form class="panel wordcloud-form" data-action="wordCloudSubmitForm">
+              <label for="wordcloud-answer">Tu palabra o frase corta</label>
+              <input id="wordcloud-answer" name="wordcloudAnswer" maxlength="80" placeholder="Ej: social media" ${closed ? "disabled" : ""} />
+              <button class="primary full" type="submit" ${closed ? "disabled" : ""}>Enviar respuesta</button>
+            </form>`
+      }
       ${footer()}
     </main>
   `;
@@ -1277,6 +1391,14 @@ function hostView(session) {
 
 function resultsSidePanel(session) {
   const stats = computeStats(session);
+  if (session.type === "wordcloud") {
+    return `
+      <div class="panel results-side wordcloud-side">
+        <h2>Nube de palabras</h2>
+        ${wordCloudVisual(stats.words || [])}
+      </div>
+    `;
+  }
   if (session.type === "quiz") {
     return `
       <div class="panel results-side">
@@ -1294,6 +1416,29 @@ function resultsSidePanel(session) {
       <h2>Distribución respuestas</h2>
       ${histogram(stats)}
       ${trendPanel(session)}
+    </div>
+  `;
+}
+
+function wordCloudVisual(words) {
+  const palette = ["#0b8f48", "#1f6fb2", "#d12aa6", "#111827", "#80bd28", "#f28b2e"];
+  const slots = [
+    [50, 49, 0], [33, 42, -90], [64, 54, 0], [48, 30, 0], [24, 57, -90], [76, 42, -90],
+    [39, 65, 0], [60, 70, 0], [18, 37, -90], [82, 62, -90], [29, 25, 0], [70, 25, 0],
+    [50, 78, 0], [15, 72, -90], [88, 28, -90], [37, 18, 0], [63, 16, 0], [21, 18, -90],
+    [79, 80, -90], [49, 88, 0], [9, 49, -90], [91, 51, -90], [28, 78, 0], [71, 83, 0],
+    [14, 28, -90], [86, 73, -90], [42, 7, 0], [58, 93, 0], [7, 65, -90], [94, 37, -90],
+    [32, 91, 0], [68, 7, 0], [50, 12, 0], [50, 62, 0]
+  ];
+  if (!words.length) return `<div class="word-cloud-shape empty">Esperando respuestas</div>`;
+  const max = Math.max(...words.map((word) => word.count), 1);
+  return `
+    <div class="word-cloud-shape">
+      ${words.map((word, index) => {
+        const [x, y, rotate] = slots[index % slots.length];
+        const size = 0.78 + (word.count / max) * 2.4;
+        return `<span style="--x:${x}%;--y:${y}%;--r:${rotate}deg;--s:${size}rem;--c:${palette[index % palette.length]}">${escapeHtml(word.text)}</span>`;
+      }).join("")}
     </div>
   `;
 }
@@ -1409,11 +1554,11 @@ function liveResultsPanel(session) {
         </div>
         <div class="metric-card average-card">
           <div>
-            <p class="eyebrow">${session.type === "quiz" ? "Promedio puntos" : "Promedio en vivo"}</p>
-            <h1>${stats.count ? stats.average.toFixed(1) : "--"}</h1>
+            <p class="eyebrow">${session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" ? "Respuestas" : "Promedio en vivo"}</p>
+            <h1>${session.type === "wordcloud" ? stats.count : stats.count ? stats.average.toFixed(1) : "--"}</h1>
             <p>${stats.count} respuestas de ${Object.keys(session.participants).length} participantes</p>
           </div>
-          ${session.type === "quiz" ? "" : thermometer(stats.average, true)}
+          ${session.type === "quiz" || session.type === "wordcloud" ? "" : thermometer(stats.average, true)}
         </div>
       </div>
       <div class="live-voters" aria-live="polite">
@@ -1627,7 +1772,7 @@ document.addEventListener("click", async (event) => {
     appState.hostSection = "history";
     render();
   }
-  if (["scale", "quiz"].includes(hostCard)) {
+  if (["scale", "quiz", "wordcloud"].includes(hostCard)) {
     appState.surveyType = hostCard;
     appState.hostSection = "create";
     render();
@@ -1690,6 +1835,7 @@ document.addEventListener("submit", async (event) => {
     });
   }
   if (action === "quizSubmitForm") await submitQuiz(event);
+  if (action === "wordCloudSubmitForm") await submitWordCloud(event);
 });
 
 document.addEventListener("change", (event) => {
