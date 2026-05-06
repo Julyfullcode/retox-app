@@ -851,6 +851,173 @@ fieldset {
   font-size: 1.7rem;
 }
 
+.digital-profile-form {
+  display: grid;
+  gap: 14px;
+}
+
+.digital-question {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.digital-question legend {
+  color: var(--blue);
+  font-weight: 900;
+  padding: 0 4px;
+}
+
+.digital-option {
+  white-space: normal;
+}
+
+.digital-result-card {
+  position: relative;
+  width: min(760px, 100%);
+  justify-self: center;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  overflow: hidden;
+  border-radius: 8px;
+  padding: clamp(22px, 5vw, 42px);
+  background:
+    linear-gradient(135deg, rgba(11, 143, 72, 0.94), rgba(31, 111, 178, 0.9)),
+    var(--green);
+  color: #fff;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.digital-result-card h1 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(2.7rem, 10vw, 6rem);
+  line-height: 0.98;
+}
+
+.digital-result-card p {
+  max-width: 620px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.88);
+  font-weight: 800;
+}
+
+.digital-result-card .eyebrow {
+  color: #fff;
+}
+
+.digital-result-art {
+  display: grid;
+  grid-template-columns: repeat(3, 48px);
+  gap: 10px;
+}
+
+.digital-result-art span {
+  height: 48px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32);
+}
+
+.digital-result-art span:nth-child(2) {
+  background: rgba(182, 226, 58, 0.7);
+}
+
+.annual-value {
+  display: grid;
+  gap: 4px;
+  min-width: min(460px, 100%);
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.16);
+  padding: 14px;
+}
+
+.annual-value span {
+  color: rgba(255, 255, 255, 0.82);
+  font-weight: 900;
+}
+
+.annual-value strong {
+  color: #fff;
+  font-size: clamp(1.8rem, 6vw, 3.7rem);
+  line-height: 1;
+}
+
+.digital-results-side {
+  gap: 14px;
+}
+
+.profile-bars,
+.digital-option-blocks,
+.digital-analysis {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-bar {
+  display: grid;
+  grid-template-columns: minmax(92px, 1fr) 34px minmax(74px, 1.2fr) 42px;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.profile-bar meter {
+  width: 100%;
+  height: 12px;
+}
+
+.digital-option-block {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.digital-option-block > strong,
+.digital-analysis strong {
+  color: var(--blue);
+  font-size: 0.88rem;
+}
+
+.digital-option-block span {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.digital-option-block small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.digital-option-block b {
+  color: var(--green);
+  font-size: 1.2rem;
+}
+
+.digital-analysis {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--green-2) 14%, var(--card));
+  padding: 12px;
+}
+
+.digital-analysis p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .bar-wrap span {
   min-height: 4px;
   border-radius: 6px 6px 0 0;
@@ -1016,6 +1183,12 @@ fieldset {
 .results-stage h1 {
   margin-top: 2px;
   font-size: clamp(3.2rem, 9vw, 5.8rem);
+}
+
+.results-stage .digital-average-card h1 {
+  max-width: 100%;
+  font-size: clamp(1.8rem, 4.2vw, 3.4rem);
+  overflow-wrap: anywhere;
 }
 
 .live-voters {
@@ -1453,6 +1626,7 @@ footer {
   .average-card,
   .results-row,
   .setup-inline-fields,
+  .profile-bar,
   .quiz-option,
   .quiz-option-head {
     grid-template-columns: 1fr;

@@ -39,6 +39,36 @@ const avatars = [
 
 const sampleNames = ["Ana", "Luis", "Mafe", "Carlos", "Sofi", "Juli", "Diana", "Mateo"];
 const defaultQuestion = "Del 1 al 10, ¿como calificas esta experiencia?";
+const DIGITAL_PROFILE_TYPE = "digitalprofile";
+const digitalProfileSurvey = {
+  title: "Perfil digital",
+  questions: [
+    {
+      text: "¿Cómo recibes la factura de EPM en tu casa?",
+      options: [
+        { id: "email", text: "Por correo electrónico", value: 1000 },
+        { id: "door", text: "En la puerta de tu casa", value: 10000 }
+      ]
+    },
+    {
+      text: "¿Cómo pagas la factura de EPM?",
+      options: [
+        { id: "entity", text: "Acudes a una entidad (banco/cooperativa/centro de pago)", value: 10000 },
+        { id: "portal", text: "Utilizas el portal de factura web de EPM", value: 10000 },
+        { id: "debit", text: "Tienes débito automático con tu entidad financiera", value: 0 }
+      ]
+    },
+    {
+      text: "¿Cuando quieres comunicarte con EPM, a través de qué medio lo haces?",
+      options: [
+        { id: "letter", text: "Radicas una carta", value: 3000 },
+        { id: "ema", text: "Le escribes a EMA", value: 10 },
+        { id: "office", text: "Acudes a una oficina", value: 50000 },
+        { id: "contact", text: "Llamas al contact center", value: 7000 }
+      ]
+    }
+  ]
+};
 
 let appState = {
   view: "welcome",
@@ -320,6 +350,10 @@ async function saveWordCloudVote(code, user, text, round) {
   return saveVoteRow(code, user, { type: "wordcloud", answers: { text, words: extractWords(text) }, round });
 }
 
+async function saveDigitalProfileVote(code, user, answers, score, round) {
+  return saveVoteRow(code, user, { type: DIGITAL_PROFILE_TYPE, answers, score, round });
+}
+
 async function saveVoteRow(code, user, vote) {
   const normalized = String(code || "").toUpperCase();
   if (!normalized || !user?.id) return false;
@@ -473,7 +507,7 @@ async function createSession(options = {}) {
   const code = sessionCode();
   const now = Date.now();
   const durationMinutes = Math.max(1, Number(options.durationMinutes || 10));
-  const type = ["quiz", "wordcloud"].includes(options.type) ? options.type : "scale";
+  const type = ["quiz", "wordcloud", DIGITAL_PROFILE_TYPE].includes(options.type) ? options.type : "scale";
   const session = {
     code,
     createdAt: now,
@@ -481,6 +515,7 @@ async function createSession(options = {}) {
     question: String(options.question || defaultQuestion).trim() || defaultQuestion,
     scaleMax: Math.max(2, Math.min(10, Number(options.scaleMax || 10))),
     quiz: type === "quiz" ? { questions: options.questions || [] } : null,
+    digitalProfile: type === DIGITAL_PROFILE_TYPE ? digitalProfileSurvey : null,
     wordCloud: type === "wordcloud" ? { maxWords: 3 } : null,
     durationMinutes,
     expiresAt: now + durationMinutes * 60 * 1000,
@@ -598,6 +633,36 @@ async function submitWordCloud(event) {
   render();
 }
 
+async function submitDigitalProfile(event) {
+  event.preventDefault();
+  if (!appState.user) return;
+  const current = await fetchSessionConfig(appState.code) || getSession(appState.code);
+  if (isSessionClosed(current)) {
+    toast("La encuesta ya esta cerrada.");
+    render();
+    return;
+  }
+  if (current.votes?.[appState.user.id]) {
+    toast("Tu perfil ya fue enviado.");
+    render();
+    return;
+  }
+  const form = new FormData(event.target);
+  const answers = {};
+  for (let qIndex = 0; qIndex < digitalProfileSurvey.questions.length; qIndex += 1) {
+    const optionIndex = form.get(`dp-${qIndex}`);
+    if (optionIndex === null) {
+      toast("Responde las tres preguntas para conocer tu perfil.");
+      return;
+    }
+    answers[qIndex] = Number(optionIndex);
+  }
+  const result = digitalProfileResult(answers);
+  const saved = await saveDigitalProfileVote(appState.code, appState.user, { ...answers, annualValue: result.annualValue, profile: result.profile.key }, result.annualValue, current.round);
+  toast(saved ? "Perfil enviado." : "Tu perfil ya fue enviado.");
+  render();
+}
+
 async function resetVotes() {
   await upsertSession(appState.code, (session) => {
     const stats = computeStats(session);
@@ -627,6 +692,20 @@ async function addDemoVotes() {
       if (session.type === "wordcloud") {
         const samples = ["experiencia digital", "servicio cercano", "social media", "innovación cliente", "confianza", "rapidez"];
         await saveWordCloudVote(appState.code, user, samples[index % samples.length], session.round);
+      } else if (session.type === DIGITAL_PROFILE_TYPE) {
+        const samples = [
+          { 0: 0, 1: 2, 2: 1 },
+          { 0: 1, 1: 0, 2: 2 },
+          { 0: 0, 1: 1, 2: 3 },
+          { 0: 1, 1: 0, 2: 3 },
+          { 0: 0, 1: 2, 2: 1 },
+          { 0: 1, 1: 1, 2: 0 },
+          { 0: 0, 1: 2, 2: 3 },
+          { 0: 1, 1: 0, 2: 2 }
+        ];
+        const answers = samples[index % samples.length];
+        const result = digitalProfileResult(answers);
+        await saveDigitalProfileVote(appState.code, user, { ...answers, annualValue: result.annualValue, profile: result.profile.key }, result.annualValue, session.round);
       } else {
         await saveScaleVote(appState.code, user, Math.ceil(Math.random() * Number(session.scaleMax || 10)), session.round);
       }
@@ -672,11 +751,13 @@ function exportSessionResults(session) {
   const rows = participants.map((participant) => {
     const avatar = avatarById(participant.avatar);
     const vote = session.votes[participant.id];
+    const digitalResult = session.type === DIGITAL_PROFILE_TYPE && vote?.answers ? digitalProfileResult(vote.answers) : null;
     return [
       participant.name,
       avatar[1],
-      session.type === "quiz" ? vote?.score ?? "" : vote?.value ?? "",
+      session.type === "quiz" ? vote?.score ?? "" : session.type === DIGITAL_PROFILE_TYPE ? digitalResult?.annualValue ?? "" : vote?.value ?? "",
       session.type === "wordcloud" ? vote?.answers?.text ?? "" : "",
+      digitalResult?.profile.label || "",
       vote?.at ? new Date(vote.at).toLocaleString("es-CO") : "",
       session.question,
       session.code,
@@ -693,12 +774,12 @@ function exportSessionResults(session) {
         ["Codigo", session.code],
         ["Tipo", surveyTypeLabel(session.type)],
         ["Pregunta", session.question],
-        [session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" ? "Respuestas" : "Promedio", stats.count ? stats.average.toFixed(2) : ""],
+        [session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" ? "Respuestas" : session.type === DIGITAL_PROFILE_TYPE ? "Valor anual promedio" : "Promedio", stats.count ? stats.average.toFixed(2) : ""],
         ["Participantes", participants.length],
         ["Respuestas", stats.count],
         ...(session.type === "quiz" ? [["Puntaje maximo", stats.maxScore]] : []),
         [],
-        ["Nombre", "Avatar", session.type === "quiz" ? "Puntaje" : "Voto", "Texto nube", "Fecha respuesta", "Pregunta", "Codigo sesion", "Ronda"],
+        ["Nombre", "Avatar", session.type === "quiz" ? "Puntaje" : session.type === DIGITAL_PROFILE_TYPE ? "Valor anual" : "Voto", "Texto nube", "Perfil digital", "Fecha respuesta", "Pregunta", "Codigo sesion", "Ronda"],
         ...rows
       ]
     },
@@ -713,6 +794,12 @@ function exportSessionResults(session) {
     }] : session.type === "wordcloud" ? [{
       name: "Nube",
       rows: [["Palabra", "Cantidad"], ...(stats.words || []).map((word) => [word.text, word.count])]
+    }] : session.type === DIGITAL_PROFILE_TYPE ? [{
+      name: "Perfil digital",
+      rows: [
+        ["Pregunta", "Opcion", "Respuestas"],
+        ...digitalProfileOptionRows(stats)
+      ]
     }] : [{
       name: "Distribucion",
       rows: [["Valor", "Cantidad"], ...distributionRows]
@@ -748,6 +835,7 @@ function exportResults() {
 function surveyTypeLabel(type) {
   if (type === "quiz") return "Quiz";
   if (type === "wordcloud") return "Nube de palabras";
+  if (type === DIGITAL_PROFILE_TYPE) return "Perfil digital";
   return "Escala";
 }
 
@@ -775,6 +863,7 @@ function excelWorkbook(sheets) {
 function computeStats(session) {
   if (session?.type === "wordcloud") return computeWordCloudStats(session);
   if (session?.type === "quiz") return computeQuizStats(session);
+  if (session?.type === DIGITAL_PROFILE_TYPE) return computeDigitalProfileStats(session);
   const values = Object.values(session?.votes || {}).map((vote) => Number(vote.value));
   const count = values.length;
   const average = count ? values.reduce((sum, value) => sum + value, 0) / count : 0;
@@ -831,6 +920,50 @@ function computeWordCloudStats(session) {
     .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text))
     .slice(0, 34);
   return { average: votes.length, count: votes.length, distribution: [], max: Math.max(1, ...words.map((word) => word.count)), words };
+}
+
+function digitalProfileResult(answers = {}) {
+  const rawScore = digitalProfileSurvey.questions.reduce((total, question, qIndex) => {
+    const option = question.options[Number(answers[qIndex])];
+    return total + Number(option?.value || 0);
+  }, 0);
+  const annualValue = rawScore * 12;
+  const profile = digitalProfileForScore(rawScore);
+  return { rawScore, annualValue, profile };
+}
+
+function digitalProfileForScore(score) {
+  const value = Number(score || 0);
+  if (value <= 5000) return { key: "very-digital", label: "Muy digital", tone: "Conectado" };
+  if (value <= 18000) return { key: "digital", label: "Digital", tone: "En evolución" };
+  if (value <= 35000) return { key: "hybrid", label: "Híbrido", tone: "A medio camino" };
+  return { key: "traditional", label: "Tradicional", tone: "Listo para avanzar" };
+}
+
+function computeDigitalProfileStats(session) {
+  const votes = Object.values(session?.votes || {});
+  const optionCounts = digitalProfileSurvey.questions.map((question) => question.options.map(() => 0));
+  const profileCounts = { traditional: 0, hybrid: 0, digital: 0, "very-digital": 0 };
+  const annualValues = votes.map((vote) => {
+    const result = digitalProfileResult(vote.answers || {});
+    Object.keys(vote.answers || {}).forEach((key) => {
+      if (!/^\d+$/.test(key)) return;
+      const qIndex = Number(key);
+      const optionIndex = Number(vote.answers[key]);
+      if (optionCounts[qIndex]?.[optionIndex] !== undefined) optionCounts[qIndex][optionIndex] += 1;
+    });
+    profileCounts[result.profile.key] = (profileCounts[result.profile.key] || 0) + 1;
+    return result.annualValue;
+  });
+  const count = votes.length;
+  const average = count ? annualValues.reduce((sum, value) => sum + value, 0) / count : 0;
+  return { average, count, distribution: [], max: 1, optionCounts, profileCounts, annualValues };
+}
+
+function digitalProfileOptionRows(stats) {
+  return digitalProfileSurvey.questions.flatMap((question, qIndex) =>
+    question.options.map((option, optionIndex) => [question.text, option.text, stats.optionCounts?.[qIndex]?.[optionIndex] || 0])
+  );
 }
 
 function remainingMs(session) {
@@ -947,7 +1080,7 @@ function hostSetupView() {
       <section class="host-portal">
         <form class="panel setup-panel" data-action="createSessionForm">
           <p class="eyebrow">Crear sesión</p>
-          <h1>${appState.surveyType === "quiz" ? "Nuevo quiz" : appState.surveyType === "wordcloud" ? "Nueva nube de palabras" : "Nueva escala"}</h1>
+          <h1>${appState.surveyType === "quiz" ? "Nuevo quiz" : appState.surveyType === "wordcloud" ? "Nueva nube de palabras" : appState.surveyType === DIGITAL_PROFILE_TYPE ? "Nuevo Perfil digital" : "Nueva escala"}</h1>
           <input type="hidden" name="type" value="${appState.surveyType}" />
           ${
             appState.surveyType === "quiz"
@@ -965,7 +1098,13 @@ function hostSetupView() {
                     <label for="setup-duration">Tiempo máximo de vigencia en minutos</label>
                     <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                   </div>`
-                : `<div class="scale-config">
+                : appState.surveyType === DIGITAL_PROFILE_TYPE
+                  ? `<div class="scale-config">
+                    <p class="muted">Encuesta fija de tres preguntas. Los valores internos no se muestran a los participantes.</p>
+                    <label for="setup-duration">Tiempo maximo de vigencia en minutos</label>
+                    <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
+                  </div>`
+                  : `<div class="scale-config">
                   <label for="setup-question">Pregunta</label>
                   <textarea id="setup-question" name="question" rows="3">${defaultQuestion}</textarea>
                   <div class="setup-inline-fields">
@@ -993,7 +1132,7 @@ function hostMenuView() {
     <main class="admin-layout">
       ${roomHeader({ code: "Host" })}
       <section class="host-menu">
-        ${hostActionCard("create", "Crear encuesta", "Configura escala, quiz o nube de palabras para compartir en vivo.", "chart")}
+        ${hostActionCard("create", "Crear encuesta", "Configura escala, quiz, nube o perfil digital para compartir en vivo.", "chart")}
         ${hostActionCard("history", "Historial", "Consulta resultados, QR, enlaces, Excel y elimina encuestas.", "archive")}
       </section>
       ${footer()}
@@ -1009,6 +1148,7 @@ function surveyTypeChoiceView() {
         ${hostActionCard("scale", "Escala", "Votacion numerica del 1 al 10 con promedio y distribucion.", "scale")}
         ${hostActionCard("quiz", "Quiz", "Preguntas con respuestas correctas, puntos y puntaje final.", "quiz")}
         ${hostActionCard("wordcloud", "Nube de palabras", "Respuestas abiertas que forman una figura según frecuencia.", "wordcloud")}
+        ${hostActionCard(DIGITAL_PROFILE_TYPE, "Perfil digital", "Clasifica canales tradicionales, hibridos, digitales y muy digitales.", "digitalprofile")}
       </section>
       ${footer()}
     </main>
@@ -1039,6 +1179,9 @@ function hostCardSvg(icon) {
   }
   if (icon === "wordcloud") {
     return `<svg viewBox="0 0 120 120"><path d="M38 78h50a18 18 0 0 0 2-36 25 25 0 0 0-48-8 22 22 0 0 0-4 44Z"/><path d="M39 56h42M49 68h28M54 44h18"/></svg>`;
+  }
+  if (icon === "digitalprofile") {
+    return `<svg viewBox="0 0 120 120"><rect x="24" y="24" width="72" height="72" rx="16"/><path d="M42 76h36M42 60h20M60 44h18"/><circle cx="42" cy="44" r="5"/><path d="M80 72l10 10 18-24"/></svg>`;
   }
   return `<svg viewBox="0 0 120 120"><rect x="24" y="28" width="72" height="58" rx="12"/><path d="M40 68h12M58 68h12M76 68h12M40 50h12M58 50h12M76 50h12"/></svg>`;
 }
@@ -1124,8 +1267,11 @@ function adminSessionRow(session) {
   const stats = computeStats(session);
   const links = sessionLinks(session.code);
   const typeLabel = surveyTypeLabel(session.type);
+  const annualFormatter = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
   const metricValue = session.type === "wordcloud"
     ? `${stats.count} respuestas`
+    : session.type === DIGITAL_PROFILE_TYPE
+      ? (stats.count ? annualFormatter.format(stats.average) : "--")
     : `${stats.count ? stats.average.toFixed(1) : "--"}${session.type === "quiz" ? " pts" : ""}`;
   return `
     <div class="admin-row">
@@ -1194,6 +1340,7 @@ function avatarOption(id, label, icon, color, checked) {
 function waitingView(session) {
   if (session.type === "wordcloud") return wordCloudParticipantView(session);
   if (session.type === "quiz") return quizParticipantView(session);
+  if (session.type === DIGITAL_PROFILE_TYPE) return digitalProfileParticipantView(session);
   const stats = computeStats(session);
   const voted = Boolean(session.votes[appState.user?.id]);
   const closed = isSessionClosed(session);
@@ -1330,6 +1477,65 @@ function quizParticipantView(session) {
   `;
 }
 
+function digitalProfileParticipantView(session) {
+  const voted = Boolean(session.votes[appState.user?.id]);
+  const closed = isSessionClosed(session);
+  const vote = session.votes[appState.user?.id];
+  const result = voted ? digitalProfileResult(vote.answers || {}) : null;
+  return `
+    <main class="app-grid digital-profile-app">
+      ${roomHeader(session)}
+      <section class="panel question-panel">
+        <p class="eyebrow">Perfil digital · ${closed ? "Cerrada" : `Tiempo restante ${formatRemaining(session)}`}</p>
+        <h1>${escapeHtml(digitalProfileSurvey.title)}</h1>
+        <p>${Object.keys(session.participants).length} participantes conectados</p>
+      </section>
+      ${
+        voted
+          ? digitalProfileResultCard(result)
+          : `<form class="panel digital-profile-form" data-action="digitalProfileSubmitForm">
+              ${digitalProfileSurvey.questions.map((question, qIndex) => `
+                <fieldset class="digital-question">
+                  <legend>${escapeHtml(question.text)}</legend>
+                  ${question.options.map((option, optionIndex) => `
+                    <label class="answer-option digital-option">
+                      <input type="radio" name="dp-${qIndex}" value="${optionIndex}" ${closed ? "disabled" : ""} />
+                      <span>${escapeHtml(option.text)}</span>
+                    </label>
+                  `).join("")}
+                </fieldset>
+              `).join("")}
+              <button class="primary full" type="submit" ${closed ? "disabled" : ""}>Conocer mi perfil</button>
+            </form>`
+      }
+      ${footer()}
+    </main>
+  `;
+}
+
+function digitalProfileResultCard(result) {
+  const formatter = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+  const invitation = result.profile.key === "very-digital"
+    ? "Tu forma de relacionarte con EPM ya aprovecha los canales digitales. Sigue usando factura web, EMA y débito automático para mantener una experiencia ágil, simple y sostenible."
+    : result.profile.key === "digital"
+      ? "Ya estás muy cerca de una experiencia más ágil. Da el siguiente paso con débito automático y EMA para resolver más en menos tiempo."
+      : "Hay una gran oportunidad para ahorrar tiempo y hacer más fácil tu relación con EPM. Pasarte a factura web, EMA y pagos digitales puede transformar tu experiencia desde hoy.";
+  return `
+    <section class="digital-result-card ${result.profile.key}">
+      <div class="digital-result-art" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <p class="eyebrow">${escapeHtml(result.profile.tone)}</p>
+      <h1>${escapeHtml(result.profile.label)}</h1>
+      <div class="annual-value">
+        <span>Valor aproximado anual para EPM</span>
+        <strong>${formatter.format(result.annualValue)}</strong>
+      </div>
+      <p>${escapeHtml(invitation)}</p>
+    </section>
+  `;
+}
+
 function scoreMood(score, maxScore) {
   const ratio = maxScore ? Number(score || 0) / maxScore : 0;
   if (ratio >= 0.8) return { icon: "😄", label: "Excelente resultado" };
@@ -1411,6 +1617,7 @@ function resultsSidePanel(session) {
       </div>
     `;
   }
+  if (session.type === DIGITAL_PROFILE_TYPE) return digitalProfileResultsPanel(session, stats);
   return `
     <div class="panel results-side">
       <h2>Distribución respuestas</h2>
@@ -1418,6 +1625,55 @@ function resultsSidePanel(session) {
       ${trendPanel(session)}
     </div>
   `;
+}
+
+function digitalProfileResultsPanel(session, stats = computeStats(session)) {
+  return `
+    <div class="panel results-side digital-results-side">
+      <h2>Perfil digital</h2>
+      <div class="profile-bars">
+        ${[
+          ["traditional", "Tradicional"],
+          ["hybrid", "Híbrido"],
+          ["digital", "Digital"],
+          ["very-digital", "Muy digital"]
+        ].map(([key, label]) => {
+          const count = stats.profileCounts?.[key] || 0;
+          const percent = stats.count ? Math.round((count / stats.count) * 100) : 0;
+          return `<div class="profile-bar"><span>${label}</span><strong>${count}</strong><meter min="0" max="100" value="${percent}"></meter><small>${percent}%</small></div>`;
+        }).join("")}
+      </div>
+      <div class="digital-option-blocks">
+        ${digitalProfileSurvey.questions.map((question, qIndex) => `
+          <div class="digital-option-block">
+            <strong>${escapeHtml(question.text)}</strong>
+            ${question.options.map((option, optionIndex) => `
+              <span><small>${escapeHtml(option.text)}</small><b>${stats.optionCounts?.[qIndex]?.[optionIndex] || 0}</b></span>
+            `).join("")}
+          </div>
+        `).join("")}
+      </div>
+      <div class="digital-analysis">
+        <strong>Análisis</strong>
+        <p>${escapeHtml(digitalProfileAnalysis(stats))}</p>
+      </div>
+    </div>
+  `;
+}
+
+function digitalProfileAnalysis(stats) {
+  if (!stats.count) return "Aún no hay respuestas. Cuando empiecen a votar, aquí aparecerá la lectura de adopción digital por canales.";
+  const digitalCount = (stats.profileCounts?.digital || 0) + (stats.profileCounts?.["very-digital"] || 0);
+  const digitalShare = Math.round((digitalCount / stats.count) * 100);
+  const topQuestion = digitalProfileSurvey.questions
+    .map((question, qIndex) => {
+      const counts = stats.optionCounts?.[qIndex] || [];
+      const topIndex = counts.reduce((best, count, index) => count > counts[best] ? index : best, 0);
+      return { question, topIndex, count: counts[topIndex] || 0 };
+    })
+    .sort((a, b) => b.count - a.count)[0];
+  const topOption = topQuestion?.question.options[topQuestion.topIndex]?.text || "sin tendencia clara";
+  return `${digitalShare}% de las respuestas ya se ubican en perfiles Digital o Muy digital. La tendencia más fuerte está en "${topOption}", útil para priorizar mensajes de migración hacia factura web, EMA y pagos digitales.`;
 }
 
 function wordCloudVisual(words) {
@@ -1538,6 +1794,8 @@ function liveResultsPanel(session) {
   const stats = computeStats(session);
   const people = votedPeople(session).slice(-5);
   const links = sessionLinks(session.code);
+  const isDigitalProfile = session.type === DIGITAL_PROFILE_TYPE;
+  const annualFormatter = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
   return `
     <div class="results-stage">
       <h2 class="live-question">${escapeHtml(session.question)}</h2>
@@ -1552,13 +1810,13 @@ function liveResultsPanel(session) {
             </a>
           `}
         </div>
-        <div class="metric-card average-card">
+        <div class="metric-card average-card ${isDigitalProfile ? "digital-average-card" : ""}">
           <div>
-            <p class="eyebrow">${session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" ? "Respuestas" : "Promedio en vivo"}</p>
-            <h1>${session.type === "wordcloud" ? stats.count : stats.count ? stats.average.toFixed(1) : "--"}</h1>
+            <p class="eyebrow">${session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" ? "Respuestas" : isDigitalProfile ? "Valor anual promedio" : "Promedio en vivo"}</p>
+            <h1>${session.type === "wordcloud" ? stats.count : isDigitalProfile ? (stats.count ? annualFormatter.format(stats.average) : "--") : stats.count ? stats.average.toFixed(1) : "--"}</h1>
             <p>${stats.count} respuestas de ${Object.keys(session.participants).length} participantes</p>
           </div>
-          ${session.type === "quiz" || session.type === "wordcloud" ? "" : thermometer(stats.average, true)}
+          ${session.type === "quiz" || session.type === "wordcloud" || isDigitalProfile ? "" : thermometer(stats.average, true)}
         </div>
       </div>
       <div class="live-voters" aria-live="polite">
@@ -1772,7 +2030,7 @@ document.addEventListener("click", async (event) => {
     appState.hostSection = "history";
     render();
   }
-  if (["scale", "quiz", "wordcloud"].includes(hostCard)) {
+  if (["scale", "quiz", "wordcloud", DIGITAL_PROFILE_TYPE].includes(hostCard)) {
     appState.surveyType = hostCard;
     appState.hostSection = "create";
     render();
@@ -1828,7 +2086,7 @@ document.addEventListener("submit", async (event) => {
     }
     await createSession({
       type,
-      question: type === "quiz" ? "Quiz" : new FormData(form).get("question"),
+      question: type === "quiz" ? "Quiz" : type === DIGITAL_PROFILE_TYPE ? digitalProfileSurvey.title : new FormData(form).get("question"),
       scaleMax: new FormData(form).get("scaleMax"),
       questions,
       durationMinutes: new FormData(form).get("durationMinutes")
@@ -1836,6 +2094,7 @@ document.addEventListener("submit", async (event) => {
   }
   if (action === "quizSubmitForm") await submitQuiz(event);
   if (action === "wordCloudSubmitForm") await submitWordCloud(event);
+  if (action === "digitalProfileSubmitForm") await submitDigitalProfile(event);
 });
 
 document.addEventListener("change", (event) => {
