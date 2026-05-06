@@ -77,7 +77,8 @@ let appState = {
   hostMode: false,
   dark: false,
   hostSection: "menu",
-  surveyType: "scale"
+  surveyType: "scale",
+  digitalProfileDraft: {}
 };
 
 function uid() {
@@ -659,6 +660,10 @@ async function submitDigitalProfile(event) {
   }
   const result = digitalProfileResult(answers);
   const saved = await saveDigitalProfileVote(appState.code, appState.user, { ...answers, annualValue: result.annualValue, profile: result.profile.key }, result.annualValue, current.round);
+  if (saved) {
+    const { [appState.code]: _sentDraft, ...rest } = appState.digitalProfileDraft || {};
+    appState.digitalProfileDraft = rest;
+  }
   toast(saved ? "Perfil enviado." : "Tu perfil ya fue enviado.");
   render();
 }
@@ -1482,6 +1487,7 @@ function digitalProfileParticipantView(session) {
   const closed = isSessionClosed(session);
   const vote = session.votes[appState.user?.id];
   const result = voted ? digitalProfileResult(vote.answers || {}) : null;
+  const draft = appState.digitalProfileDraft?.[session.code] || {};
   return `
     <main class="app-grid digital-profile-app">
       ${roomHeader(session)}
@@ -1499,7 +1505,7 @@ function digitalProfileParticipantView(session) {
                   <legend>${escapeHtml(question.text)}</legend>
                   ${question.options.map((option, optionIndex) => `
                     <label class="answer-option digital-option">
-                      <input type="radio" name="dp-${qIndex}" value="${optionIndex}" ${closed ? "disabled" : ""} />
+                      <input type="radio" name="dp-${qIndex}" value="${optionIndex}" ${Number(draft[qIndex]) === optionIndex ? "checked" : ""} ${closed ? "disabled" : ""} />
                       <span>${escapeHtml(option.text)}</span>
                     </label>
                   `).join("")}
@@ -2047,7 +2053,7 @@ document.addEventListener("click", async (event) => {
     render();
   }
   if (action === "home") {
-    appState = { ...appState, view: "welcome", code: "", hostMode: false, hostSection: "menu" };
+    appState = { ...appState, view: "welcome", code: "", hostMode: false, hostSection: "menu", digitalProfileDraft: {} };
     history.replaceState(null, "", appBaseUrl());
     render();
   }
@@ -2098,6 +2104,16 @@ document.addEventListener("submit", async (event) => {
 });
 
 document.addEventListener("change", (event) => {
+  if (event.target.name?.startsWith("dp-")) {
+    const qIndex = event.target.name.split("-")[1];
+    appState.digitalProfileDraft = {
+      ...(appState.digitalProfileDraft || {}),
+      [appState.code]: {
+        ...(appState.digitalProfileDraft?.[appState.code] || {}),
+        [qIndex]: Number(event.target.value)
+      }
+    };
+  }
   if (event.target.dataset.action === "sessionType") {
     const isQuiz = event.target.value === "quiz";
     document.querySelector(".quiz-config").hidden = !isQuiz;
