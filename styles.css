@@ -909,22 +909,79 @@ fieldset {
   animation: result-pop 0.7s ease both;
 }
 
-.digital-result-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(105deg, transparent 12%, rgba(255, 255, 255, 0.24) 42%, transparent 72%);
-  transform: translateX(-120%);
-  animation: result-shine 1.8s ease 0.25s both;
-}
-
 .digital-result-card h1 {
   margin: 0;
   color: #fff;
   font-size: clamp(2.7rem, 10vw, 6rem);
   line-height: 0.98;
 }
+
+.celebration {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.balloon,
+.confetti {
+  position: absolute;
+  display: block;
+}
+
+.balloon {
+  width: 30px;
+  height: 38px;
+  border-radius: 50% 50% 46% 46%;
+  background: #b6e23a;
+  box-shadow: inset -7px -8px 0 rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  animation: balloon-rise 2.4s ease-out 0.15s both;
+}
+
+.balloon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 34px;
+  width: 1px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.balloon.b1 {
+  left: 8%;
+  bottom: -58px;
+}
+
+.balloon.b2 {
+  right: 9%;
+  bottom: -54px;
+  background: #ffd84d;
+  animation-delay: 0.3s;
+}
+
+.balloon.b3 {
+  left: 50%;
+  bottom: -70px;
+  background: #7fd5ff;
+  animation-delay: 0.48s;
+}
+
+.confetti {
+  width: 9px;
+  height: 15px;
+  border-radius: 2px;
+  background: #fff;
+  opacity: 0;
+  animation: confetti-fall 1.6s ease-out both;
+}
+
+.confetti.c1 { left: 17%; top: -18px; background: #ffd84d; animation-delay: 0.08s; }
+.confetti.c2 { left: 31%; top: -22px; background: #b6e23a; animation-delay: 0.2s; }
+.confetti.c3 { left: 55%; top: -20px; background: #7fd5ff; animation-delay: 0.12s; }
+.confetti.c4 { left: 71%; top: -24px; background: #fff; animation-delay: 0.28s; }
+.confetti.c5 { left: 84%; top: -18px; background: #ffd84d; animation-delay: 0.38s; }
 
 .digital-result-card p {
   max-width: 620px;
@@ -1660,12 +1717,6 @@ footer {
   }
 }
 
-@keyframes result-shine {
-  to {
-    transform: translateX(120%);
-  }
-}
-
 @keyframes avatar-bounce {
   0% {
     transform: scale(0.6);
@@ -1675,6 +1726,34 @@ footer {
   }
   100% {
     transform: scale(1);
+  }
+}
+
+@keyframes balloon-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.82) rotate(-5deg);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-210px) scale(1.04) rotate(7deg);
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px) rotate(0deg);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(190px) rotate(230deg);
   }
 }
 

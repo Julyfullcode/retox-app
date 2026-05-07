@@ -1587,18 +1587,23 @@ function digitalProfileResultCard(result, user) {
   const formatter = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
   const [, avatarLabel, avatarIcon] = avatarById(user?.avatar);
   const costText = formatter.format(result.estimatedValue);
-  let invitation = result.profile.key === "very-digital"
-    ? "Tu forma de relacionarte con EPM ya aprovecha los canales digitales. Sigue usando factura web, EMA y débito automático para mantener una experiencia ágil, simple y sostenible."
+  const invitation = result.profile.key === "very-digital"
+    ? `Segun tus respuestas, al ano le estas generando a EPM un costo aproximado de ${costText}. Excelente: ya estas ayudando a que la atencion sea mas agil, simple y sostenible. Sigue usando EMA, factura web y pagos digitales; tu habito digital suma mucho.`
     : result.profile.key === "digital"
-      ? "Ya estás muy cerca de una experiencia más ágil. Da el siguiente paso con débito automático y EMA para resolver más en menos tiempo."
-      : "Hay una gran oportunidad para ahorrar tiempo y hacer más fácil tu relación con EPM. Pasarte a factura web, EMA y pagos digitales puede transformar tu experiencia desde hoy.";
-  invitation = result.profile.key === "very-digital"
-    ? `Segun tus respuestas, al ano le estas generando a EPM un costo aproximado de ${costText}. Tu perfil ya aprovecha muy bien los canales digitales; sigue usando EMA, factura web y pagos digitales para mantener una experiencia agil y sostenible.`
-    : result.profile.key === "digital"
-      ? `Segun tus respuestas, al ano le estas generando a EPM un costo aproximado de ${costText}. Vas por buen camino: dar el siguiente paso hacia EMA, factura web o debito automatico puede hacer tu experiencia todavia mas simple.`
-      : `Segun tus respuestas, al ano le estas generando a EPM un costo aproximado de ${costText}. Hay una gran oportunidad para ahorrar tiempo y hacerlo mas facil: los canales digitales pueden transformar tu experiencia desde hoy.`;
+      ? `Segun tus respuestas, al ano le estas generando a EPM un costo aproximado de ${costText}. Vas muy bien: con uno o dos pasos mas hacia EMA, factura web o pagos digitales puedes ahorrar tiempo y hacer cada tramite mas facil.`
+      : `Segun tus respuestas, al ano le estas generando a EPM un costo aproximado de ${costText}. Hoy tienes una oportunidad enorme para ganar tiempo y evitar filas: prueba un canal digital en tu proximo contacto y descubre una forma mas rapida de resolver.`;
   return `
     <section class="digital-result-card ${result.profile.key}">
+      <div class="celebration" aria-hidden="true">
+        <span class="balloon b1"></span>
+        <span class="balloon b2"></span>
+        <span class="balloon b3"></span>
+        <span class="confetti c1"></span>
+        <span class="confetti c2"></span>
+        <span class="confetti c3"></span>
+        <span class="confetti c4"></span>
+        <span class="confetti c5"></span>
+      </div>
       <div class="digital-result-person">
         <span class="result-avatar" title="${escapeHtml(avatarLabel)}">${avatarIcon}</span>
         <strong>${escapeHtml(user?.name || "Participante")}</strong>
