@@ -44,32 +44,33 @@ const digitalProfileSurvey = {
   title: "Perfil digital",
   questions: [
     {
-      text: "¿Cómo recibes la factura de EPM en tu casa?",
+      text: "Como recibes la factura de EPM?",
       options: [
-        { id: "email", text: "Por correo electrónico", value: 1000 },
-        { id: "door", text: "En la puerta de tu casa", value: 10000 }
+        { id: "door", text: "En la puerta de mi casa", value: 11377 },
+        { id: "email", text: "Por correo electronico o whatsapp", value: 408 }
       ]
     },
     {
-      text: "¿Cómo pagas la factura de EPM?",
+      text: "Como pagas la factura de EPM?",
       options: [
-        { id: "entity", text: "Acudes a una entidad (banco/cooperativa/centro de pago)", value: 10000 },
-        { id: "portal", text: "Utilizas el portal de factura web de EPM", value: 10000 },
-        { id: "debit", text: "Tienes débito automático con tu entidad financiera", value: 0 }
+        { id: "portal", text: "Utilizas el portal de factura web de EPM", value: 0 },
+        { id: "gana", text: "Vas a un gana, coofinep, cotrafa, etc.", value: 9228 },
+        { id: "debit", text: "Tienes debito automatico con tu entidad financiera", value: 2664 },
+        { id: "bank", text: "Vas a la taquilla del banco", value: 5124 }
       ]
     },
     {
-      text: "¿Cuando quieres comunicarte con EPM, a través de qué medio lo haces?",
+      text: "Cuando quieres comunicarte con EPM, a traves de que medio lo haces?",
       options: [
-        { id: "letter", text: "Radicas una carta", value: 3000 },
-        { id: "ema", text: "Le escribes a EMA", value: 10 },
-        { id: "office", text: "Acudes a una oficina", value: 50000 },
-        { id: "contact", text: "Llamas al contact center", value: 7000 }
+        { id: "ema", text: "Le escribo a EMA", value: 5106 },
+        { id: "office", text: "Acudo a una oficina", value: 600000 },
+        { id: "web", text: "Acudo a la pagina web", value: 19860 },
+        { id: "letter", text: "Radico una carta", value: 600000 },
+        { id: "contact", text: "Llamo al contact center", value: 50304 }
       ]
     }
   ]
 };
-
 function defaultDigitalProfileSurvey() {
   return JSON.parse(JSON.stringify(digitalProfileSurvey));
 }
@@ -950,9 +951,9 @@ function digitalProfileResult(session, answers = {}) {
 
 function digitalProfileForScore(score) {
   const value = Number(score || 0);
-  if (value <= 5000) return { key: "very-digital", label: "Muy digital", tone: "Conectado" };
-  if (value <= 18000) return { key: "digital", label: "Digital", tone: "En evolución" };
-  if (value <= 35000) return { key: "hybrid", label: "Híbrido", tone: "A medio camino" };
+  if (value <= 10000) return { key: "very-digital", label: "Muy digital", tone: "Conectado" };
+  if (value <= 35000) return { key: "digital", label: "Digital", tone: "En evolución" };
+  if (value <= 120000) return { key: "hybrid", label: "Híbrido", tone: "A medio camino" };
   return { key: "traditional", label: "Tradicional", tone: "Listo para avanzar" };
 }
 

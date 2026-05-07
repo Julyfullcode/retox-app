@@ -1,4 +1,4 @@
-const CACHE_NAME = "retox-v39";
+const CACHE_NAME = "retox-v40";
 const ASSETS = [
   "./",
   "./index.html",
