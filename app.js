@@ -669,6 +669,7 @@ async function submitDigitalProfile(event) {
   if (saved) {
     const { [appState.code]: _sentDraft, ...rest } = appState.digitalProfileDraft || {};
     appState.digitalProfileDraft = rest;
+    playDigitalProfileSound(result.profile.key);
   }
   toast(saved ? "Perfil enviado." : "Tu perfil ya fue enviado.");
   render();
@@ -1585,11 +1586,17 @@ function digitalProfileParticipantView(session) {
 function digitalProfileResultCard(result, user) {
   const formatter = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
   const [, avatarLabel, avatarIcon] = avatarById(user?.avatar);
-  const invitation = result.profile.key === "very-digital"
+  const costText = formatter.format(result.estimatedValue);
+  let invitation = result.profile.key === "very-digital"
     ? "Tu forma de relacionarte con EPM ya aprovecha los canales digitales. Sigue usando factura web, EMA y débito automático para mantener una experiencia ágil, simple y sostenible."
     : result.profile.key === "digital"
       ? "Ya estás muy cerca de una experiencia más ágil. Da el siguiente paso con débito automático y EMA para resolver más en menos tiempo."
       : "Hay una gran oportunidad para ahorrar tiempo y hacer más fácil tu relación con EPM. Pasarte a factura web, EMA y pagos digitales puede transformar tu experiencia desde hoy.";
+  invitation = result.profile.key === "very-digital"
+    ? `Segun tus respuestas, al ano le estas generando a EPM un costo aproximado de ${costText}. Tu perfil ya aprovecha muy bien los canales digitales; sigue usando EMA, factura web y pagos digitales para mantener una experiencia agil y sostenible.`
+    : result.profile.key === "digital"
+      ? `Segun tus respuestas, al ano le estas generando a EPM un costo aproximado de ${costText}. Vas por buen camino: dar el siguiente paso hacia EMA, factura web o debito automatico puede hacer tu experiencia todavia mas simple.`
+      : `Segun tus respuestas, al ano le estas generando a EPM un costo aproximado de ${costText}. Hay una gran oportunidad para ahorrar tiempo y hacerlo mas facil: los canales digitales pueden transformar tu experiencia desde hoy.`;
   return `
     <section class="digital-result-card ${result.profile.key}">
       <div class="digital-result-person">
@@ -1599,7 +1606,7 @@ function digitalProfileResultCard(result, user) {
       <p class="eyebrow">${escapeHtml(result.profile.tone)}</p>
       <h1>${escapeHtml(result.profile.label)}</h1>
       <div class="annual-value">
-        <span>Valor aproximado para EPM</span>
+        <span>Costo estimado anual para EPM</span>
         <strong>${formatter.format(result.estimatedValue)}</strong>
       </div>
       <p>${escapeHtml(invitation)}</p>
@@ -1749,6 +1756,16 @@ function digitalProfileAnalysis(stats) {
   return `${digitalShare}% de las respuestas ya se ubican en perfiles Digital o Muy digital. La tendencia más fuerte está en "${topOption}", útil para priorizar mensajes de migración hacia factura web, EMA y pagos digitales.`;
 }
 
+function digitalProfileAverageAnalysis(stats) {
+  if (!stats.count) return "El analisis aparecera cuando lleguen las primeras respuestas.";
+  const digitalCount = (stats.profileCounts?.digital || 0) + (stats.profileCounts?.["very-digital"] || 0);
+  const digitalShare = Math.round((digitalCount / stats.count) * 100);
+  const traditionalShare = Math.round(((stats.profileCounts?.traditional || 0) / stats.count) * 100);
+  if (traditionalShare >= 40) return `${traditionalShare}% esta en perfil Tradicional. La mayor oportunidad esta en mover atencion y pagos hacia canales digitales.`;
+  if (digitalShare >= 60) return `${digitalShare}% ya esta en perfiles Digital o Muy digital. Conviene reforzar EMA, factura web y pagos digitales para sostener el avance.`;
+  return `${digitalShare}% esta en perfiles Digital o Muy digital. Hay una mezcla de habitos: buen momento para invitar a migrar los canales mas costosos.`;
+}
+
 function wordCloudVisual(words) {
   const palette = ["#0b8f48", "#1f6fb2", "#d12aa6", "#111827", "#80bd28", "#f28b2e"];
   const slots = [
@@ -1889,6 +1906,7 @@ function liveResultsPanel(session) {
             <h1>${session.type === "wordcloud" ? stats.count : isDigitalProfile ? (stats.count ? annualFormatter.format(stats.average) : "--") : stats.count ? stats.average.toFixed(1) : "--"}</h1>
             <p>${stats.count} respuestas de ${Object.keys(session.participants).length} participantes</p>
           </div>
+          ${isDigitalProfile ? `<div class="digital-average-analysis"><strong>Analisis</strong><p>${escapeHtml(digitalProfileAverageAnalysis(stats))}</p></div>` : ""}
           ${session.type === "quiz" || session.type === "wordcloud" || isDigitalProfile ? "" : thermometer(stats.average, true)}
         </div>
       </div>
@@ -2011,8 +2029,41 @@ async function copyToClipboard(value) {
   }
 }
 
+function playDigitalProfileSound(profileKey) {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const context = new AudioContextClass();
+    context.resume?.();
+    const now = context.currentTime;
+    const notesByProfile = {
+      "very-digital": [659, 784, 988, 1319],
+      digital: [523, 659, 784],
+      hybrid: [392, 523, 659],
+      traditional: [330, 392, 494]
+    };
+    const notes = notesByProfile[profileKey] || notesByProfile.hybrid;
+    notes.forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = profileKey === "traditional" ? "triangle" : "sine";
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.0001, now + index * 0.11);
+      gain.gain.exponentialRampToValueAtTime(0.09, now + index * 0.11 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.11 + 0.18);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start(now + index * 0.11);
+      oscillator.stop(now + index * 0.11 + 0.2);
+    });
+    setTimeout(() => context.close(), 900);
+  } catch {
+    // El sonido es decorativo; si el navegador lo bloquea, la encuesta sigue normal.
+  }
+}
+
 function render() {
   const root = document.querySelector("#app");
+  const digitalResultsScroll = document.querySelector(".digital-results-side")?.scrollTop || 0;
   document.body.classList.toggle("dark", appState.dark);
   const hashJoin = location.hash.match(/join=([A-Z0-9]{4})/i);
   const hashHost = location.hash.match(/host=([A-Z0-9]{4})/i);
@@ -2079,6 +2130,8 @@ function render() {
     const input = document.querySelector("#code");
     if (input) input.value = appState.code;
   }
+  const digitalResultsSide = document.querySelector(".digital-results-side");
+  if (digitalResultsSide) digitalResultsSide.scrollTop = digitalResultsScroll;
 }
 
 document.addEventListener("click", async (event) => {

@@ -906,6 +906,17 @@ fieldset {
   color: #fff;
   text-align: center;
   box-shadow: var(--shadow);
+  animation: result-pop 0.7s ease both;
+}
+
+.digital-result-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 12%, rgba(255, 255, 255, 0.24) 42%, transparent 72%);
+  transform: translateX(-120%);
+  animation: result-shine 1.8s ease 0.25s both;
 }
 
 .digital-result-card h1 {
@@ -945,6 +956,7 @@ fieldset {
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.24);
   font-size: 1.7rem;
+  animation: avatar-bounce 0.75s ease 0.15s both;
 }
 
 .digital-result-person strong {
@@ -971,6 +983,30 @@ fieldset {
   color: #fff;
   font-size: clamp(1.8rem, 6vw, 3.7rem);
   line-height: 1;
+}
+
+.digital-average-analysis {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  min-height: 100%;
+  border-left: 1px solid rgba(255, 255, 255, 0.28);
+  padding-left: 14px;
+  text-align: left;
+}
+
+.digital-average-analysis strong {
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 900;
+}
+
+.digital-average-analysis p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: clamp(0.78rem, 1.35vw, 0.98rem);
+  font-weight: 800;
+  line-height: 1.28;
 }
 
 .digital-results-side {
@@ -1225,6 +1261,10 @@ fieldset {
   max-width: 100%;
   font-size: clamp(1.8rem, 4.2vw, 3.4rem);
   overflow-wrap: anywhere;
+}
+
+.results-stage .digital-average-card {
+  grid-template-columns: minmax(0, 0.9fr) minmax(190px, 1fr);
 }
 
 .live-voters {
@@ -1609,6 +1649,35 @@ footer {
   }
 }
 
+@keyframes result-pop {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes result-shine {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes avatar-bounce {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 @media (min-width: 760px) {
   .avatar-grid {
     grid-template-columns: repeat(5, 1fr);
@@ -1672,6 +1741,18 @@ footer {
 
   .quiz-option-head span:last-child {
     grid-column: 1;
+  }
+
+  .results-stage .digital-average-card {
+    grid-template-columns: 1fr;
+  }
+
+  .digital-average-analysis {
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.28);
+    padding-left: 0;
+    padding-top: 10px;
+    text-align: center;
   }
 
   .share-row {
