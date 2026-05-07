@@ -70,6 +70,10 @@ const digitalProfileSurvey = {
   ]
 };
 
+function defaultDigitalProfileSurvey() {
+  return JSON.parse(JSON.stringify(digitalProfileSurvey));
+}
+
 let appState = {
   view: "welcome",
   code: "",
@@ -516,7 +520,7 @@ async function createSession(options = {}) {
     question: String(options.question || defaultQuestion).trim() || defaultQuestion,
     scaleMax: Math.max(2, Math.min(10, Number(options.scaleMax || 10))),
     quiz: type === "quiz" ? { questions: options.questions || [] } : null,
-    digitalProfile: type === DIGITAL_PROFILE_TYPE ? digitalProfileSurvey : null,
+    digitalProfile: type === DIGITAL_PROFILE_TYPE ? { title: digitalProfileSurvey.title, questions: options.digitalProfileQuestions || defaultDigitalProfileSurvey().questions } : null,
     wordCloud: type === "wordcloud" ? { maxWords: 3 } : null,
     durationMinutes,
     expiresAt: now + durationMinutes * 60 * 1000,
@@ -650,7 +654,8 @@ async function submitDigitalProfile(event) {
   }
   const form = new FormData(event.target);
   const answers = {};
-  for (let qIndex = 0; qIndex < digitalProfileSurvey.questions.length; qIndex += 1) {
+  const survey = digitalProfileConfig(current);
+  for (let qIndex = 0; qIndex < survey.questions.length; qIndex += 1) {
     const optionIndex = form.get(`dp-${qIndex}`);
     if (optionIndex === null) {
       toast("Responde las tres preguntas para conocer tu perfil.");
@@ -658,8 +663,8 @@ async function submitDigitalProfile(event) {
     }
     answers[qIndex] = Number(optionIndex);
   }
-  const result = digitalProfileResult(answers);
-  const saved = await saveDigitalProfileVote(appState.code, appState.user, { ...answers, annualValue: result.annualValue, profile: result.profile.key }, result.annualValue, current.round);
+  const result = digitalProfileResult(current, answers);
+  const saved = await saveDigitalProfileVote(appState.code, appState.user, { ...answers, estimatedValue: result.estimatedValue, profile: result.profile.key }, result.estimatedValue, current.round);
   if (saved) {
     const { [appState.code]: _sentDraft, ...rest } = appState.digitalProfileDraft || {};
     appState.digitalProfileDraft = rest;
@@ -709,8 +714,8 @@ async function addDemoVotes() {
           { 0: 1, 1: 0, 2: 2 }
         ];
         const answers = samples[index % samples.length];
-        const result = digitalProfileResult(answers);
-        await saveDigitalProfileVote(appState.code, user, { ...answers, annualValue: result.annualValue, profile: result.profile.key }, result.annualValue, session.round);
+        const result = digitalProfileResult(session, answers);
+        await saveDigitalProfileVote(appState.code, user, { ...answers, estimatedValue: result.estimatedValue, profile: result.profile.key }, result.estimatedValue, session.round);
       } else {
         await saveScaleVote(appState.code, user, Math.ceil(Math.random() * Number(session.scaleMax || 10)), session.round);
       }
@@ -756,11 +761,11 @@ function exportSessionResults(session) {
   const rows = participants.map((participant) => {
     const avatar = avatarById(participant.avatar);
     const vote = session.votes[participant.id];
-    const digitalResult = session.type === DIGITAL_PROFILE_TYPE && vote?.answers ? digitalProfileResult(vote.answers) : null;
+    const digitalResult = session.type === DIGITAL_PROFILE_TYPE && vote?.answers ? digitalProfileResult(session, vote.answers) : null;
     return [
       participant.name,
       avatar[1],
-      session.type === "quiz" ? vote?.score ?? "" : session.type === DIGITAL_PROFILE_TYPE ? digitalResult?.annualValue ?? "" : vote?.value ?? "",
+      session.type === "quiz" ? vote?.score ?? "" : session.type === DIGITAL_PROFILE_TYPE ? digitalResult?.estimatedValue ?? "" : vote?.value ?? "",
       session.type === "wordcloud" ? vote?.answers?.text ?? "" : "",
       digitalResult?.profile.label || "",
       vote?.at ? new Date(vote.at).toLocaleString("es-CO") : "",
@@ -779,12 +784,12 @@ function exportSessionResults(session) {
         ["Codigo", session.code],
         ["Tipo", surveyTypeLabel(session.type)],
         ["Pregunta", session.question],
-        [session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" ? "Respuestas" : session.type === DIGITAL_PROFILE_TYPE ? "Valor anual promedio" : "Promedio", stats.count ? stats.average.toFixed(2) : ""],
+        [session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" ? "Respuestas" : session.type === DIGITAL_PROFILE_TYPE ? "Valor promedio" : "Promedio", stats.count ? stats.average.toFixed(2) : ""],
         ["Participantes", participants.length],
         ["Respuestas", stats.count],
         ...(session.type === "quiz" ? [["Puntaje maximo", stats.maxScore]] : []),
         [],
-        ["Nombre", "Avatar", session.type === "quiz" ? "Puntaje" : session.type === DIGITAL_PROFILE_TYPE ? "Valor anual" : "Voto", "Texto nube", "Perfil digital", "Fecha respuesta", "Pregunta", "Codigo sesion", "Ronda"],
+        ["Nombre", "Avatar", session.type === "quiz" ? "Puntaje" : session.type === DIGITAL_PROFILE_TYPE ? "Valor estimado" : "Voto", "Texto nube", "Perfil digital", "Fecha respuesta", "Pregunta", "Codigo sesion", "Ronda"],
         ...rows
       ]
     },
@@ -927,14 +932,20 @@ function computeWordCloudStats(session) {
   return { average: votes.length, count: votes.length, distribution: [], max: Math.max(1, ...words.map((word) => word.count)), words };
 }
 
-function digitalProfileResult(answers = {}) {
-  const rawScore = digitalProfileSurvey.questions.reduce((total, question, qIndex) => {
+function digitalProfileConfig(session) {
+  const config = session?.digitalProfile?.questions?.length ? session.digitalProfile : defaultDigitalProfileSurvey();
+  return { title: config.title || digitalProfileSurvey.title, questions: config.questions || [] };
+}
+
+function digitalProfileResult(session, answers = {}) {
+  const survey = digitalProfileConfig(session);
+  const rawScore = survey.questions.reduce((total, question, qIndex) => {
     const option = question.options[Number(answers[qIndex])];
     return total + Number(option?.value || 0);
   }, 0);
-  const annualValue = rawScore * 12;
+  const estimatedValue = rawScore;
   const profile = digitalProfileForScore(rawScore);
-  return { rawScore, annualValue, profile };
+  return { rawScore, estimatedValue, profile };
 }
 
 function digitalProfileForScore(score) {
@@ -946,11 +957,12 @@ function digitalProfileForScore(score) {
 }
 
 function computeDigitalProfileStats(session) {
+  const survey = digitalProfileConfig(session);
   const votes = Object.values(session?.votes || {});
-  const optionCounts = digitalProfileSurvey.questions.map((question) => question.options.map(() => 0));
+  const optionCounts = survey.questions.map((question) => question.options.map(() => 0));
   const profileCounts = { traditional: 0, hybrid: 0, digital: 0, "very-digital": 0 };
-  const annualValues = votes.map((vote) => {
-    const result = digitalProfileResult(vote.answers || {});
+  const estimatedValues = votes.map((vote) => {
+    const result = digitalProfileResult(session, vote.answers || {});
     Object.keys(vote.answers || {}).forEach((key) => {
       if (!/^\d+$/.test(key)) return;
       const qIndex = Number(key);
@@ -958,15 +970,16 @@ function computeDigitalProfileStats(session) {
       if (optionCounts[qIndex]?.[optionIndex] !== undefined) optionCounts[qIndex][optionIndex] += 1;
     });
     profileCounts[result.profile.key] = (profileCounts[result.profile.key] || 0) + 1;
-    return result.annualValue;
+    return result.estimatedValue;
   });
   const count = votes.length;
-  const average = count ? annualValues.reduce((sum, value) => sum + value, 0) / count : 0;
-  return { average, count, distribution: [], max: 1, optionCounts, profileCounts, annualValues };
+  const average = count ? estimatedValues.reduce((sum, value) => sum + value, 0) / count : 0;
+  return { average, count, distribution: [], max: 1, optionCounts, profileCounts, estimatedValues, survey };
 }
 
 function digitalProfileOptionRows(stats) {
-  return digitalProfileSurvey.questions.flatMap((question, qIndex) =>
+  const survey = stats.survey || defaultDigitalProfileSurvey();
+  return survey.questions.flatMap((question, qIndex) =>
     question.options.map((option, optionIndex) => [question.text, option.text, stats.optionCounts?.[qIndex]?.[optionIndex] || 0])
   );
 }
@@ -1104,8 +1117,12 @@ function hostSetupView() {
                     <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                   </div>`
                 : appState.surveyType === DIGITAL_PROFILE_TYPE
-                  ? `<div class="scale-config">
-                    <p class="muted">Encuesta fija de tres preguntas. Los valores internos no se muestran a los participantes.</p>
+                  ? `<div class="digital-profile-config">
+                    <p class="muted">Edita las preguntas, respuestas y valores internos. Los valores no se muestran a los participantes.</p>
+                    <div class="digital-profile-builder" id="digital-profile-builder">
+                      ${defaultDigitalProfileSurvey().questions.map((question, index) => digitalProfileQuestionTemplate(index, question)).join("")}
+                    </div>
+                    <button class="secondary compact-button" type="button" data-action="addDigitalProfileQuestion">Agregar pregunta</button>
                     <label for="setup-duration">Tiempo maximo de vigencia en minutos</label>
                     <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                   </div>`
@@ -1228,6 +1245,50 @@ function parseQuizForm(form) {
       text: optionNode.querySelector(`[name="quizOption-${qIndex}"]`)?.value.trim() || `Opción ${optionIndex + 1}`,
       correct: Boolean(optionNode.querySelector(`[name="quizCorrect-${qIndex}-${optionIndex}"]`)?.checked),
       points: Number(optionNode.querySelector(`[name="quizPoints-${qIndex}-${optionIndex}"]`)?.value || 0)
+    })).filter((option) => option.text);
+    return { text: text || `Pregunta ${qIndex + 1}`, options };
+  }).filter((question) => question.options.length);
+}
+
+function digitalProfileQuestionTemplate(index, question = {}) {
+  const options = question.options?.length ? question.options : [
+    { text: "", value: 0 },
+    { text: "", value: 0 }
+  ];
+  return `
+    <div class="digital-profile-question" data-digital-question-index="${index}">
+      <label>Pregunta ${index + 1}</label>
+      <input name="digitalProfileQuestion" placeholder="Texto de la pregunta" value="${escapeHtml(question.text || "")}" />
+      <div class="digital-profile-option-head" aria-hidden="true">
+        <span>Respuestas</span>
+        <span>Valor interno</span>
+      </div>
+      <div class="digital-profile-options">
+        ${options.map((option, optionIndex) => digitalProfileOptionTemplate(index, optionIndex, option)).join("")}
+      </div>
+      <div class="quiz-actions">
+        <button class="secondary compact-button" type="button" data-action="addDigitalProfileOption">Agregar respuesta</button>
+      </div>
+    </div>
+  `;
+}
+
+function digitalProfileOptionTemplate(questionIndex, optionIndex, option = {}) {
+  return `
+    <div class="digital-profile-option">
+      <input name="digitalProfileOption-${questionIndex}" placeholder="Respuesta ${optionIndex + 1}" value="${escapeHtml(option.text || "")}" />
+      <input name="digitalProfileValue-${questionIndex}-${optionIndex}" type="number" min="0" value="${Number(option.value || 0)}" aria-label="Valor interno" />
+    </div>
+  `;
+}
+
+function parseDigitalProfileForm(form) {
+  return [...form.querySelectorAll(".digital-profile-question")].map((node, qIndex) => {
+    const text = node.querySelector('[name="digitalProfileQuestion"]').value.trim();
+    const options = [...node.querySelectorAll(".digital-profile-option")].map((optionNode, optionIndex) => ({
+      id: `q${qIndex}-o${optionIndex}`,
+      text: optionNode.querySelector(`[name="digitalProfileOption-${qIndex}"]`)?.value.trim() || `Respuesta ${optionIndex + 1}`,
+      value: Number(optionNode.querySelector(`[name="digitalProfileValue-${qIndex}-${optionIndex}"]`)?.value || 0)
     })).filter((option) => option.text);
     return { text: text || `Pregunta ${qIndex + 1}`, options };
   }).filter((question) => question.options.length);
@@ -1486,21 +1547,22 @@ function digitalProfileParticipantView(session) {
   const voted = Boolean(session.votes[appState.user?.id]);
   const closed = isSessionClosed(session);
   const vote = session.votes[appState.user?.id];
-  const result = voted ? digitalProfileResult(vote.answers || {}) : null;
+  const survey = digitalProfileConfig(session);
+  const result = voted ? digitalProfileResult(session, vote.answers || {}) : null;
   const draft = appState.digitalProfileDraft?.[session.code] || {};
   return `
     <main class="app-grid digital-profile-app">
       ${roomHeader(session)}
-      <section class="panel question-panel">
+      ${voted ? "" : `<section class="panel question-panel">
         <p class="eyebrow">Perfil digital · ${closed ? "Cerrada" : `Tiempo restante ${formatRemaining(session)}`}</p>
-        <h1>${escapeHtml(digitalProfileSurvey.title)}</h1>
+        <h1>${escapeHtml(survey.title)}</h1>
         <p>${Object.keys(session.participants).length} participantes conectados</p>
-      </section>
+      </section>`}
       ${
         voted
-          ? digitalProfileResultCard(result)
+          ? digitalProfileResultCard(result, appState.user)
           : `<form class="panel digital-profile-form" data-action="digitalProfileSubmitForm">
-              ${digitalProfileSurvey.questions.map((question, qIndex) => `
+              ${survey.questions.map((question, qIndex) => `
                 <fieldset class="digital-question">
                   <legend>${escapeHtml(question.text)}</legend>
                   ${question.options.map((option, optionIndex) => `
@@ -1519,8 +1581,9 @@ function digitalProfileParticipantView(session) {
   `;
 }
 
-function digitalProfileResultCard(result) {
+function digitalProfileResultCard(result, user) {
   const formatter = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+  const [, avatarLabel, avatarIcon] = avatarById(user?.avatar);
   const invitation = result.profile.key === "very-digital"
     ? "Tu forma de relacionarte con EPM ya aprovecha los canales digitales. Sigue usando factura web, EMA y débito automático para mantener una experiencia ágil, simple y sostenible."
     : result.profile.key === "digital"
@@ -1528,14 +1591,15 @@ function digitalProfileResultCard(result) {
       : "Hay una gran oportunidad para ahorrar tiempo y hacer más fácil tu relación con EPM. Pasarte a factura web, EMA y pagos digitales puede transformar tu experiencia desde hoy.";
   return `
     <section class="digital-result-card ${result.profile.key}">
-      <div class="digital-result-art" aria-hidden="true">
-        <span></span><span></span><span></span>
+      <div class="digital-result-person">
+        <span class="result-avatar" title="${escapeHtml(avatarLabel)}">${avatarIcon}</span>
+        <strong>${escapeHtml(user?.name || "Participante")}</strong>
       </div>
       <p class="eyebrow">${escapeHtml(result.profile.tone)}</p>
       <h1>${escapeHtml(result.profile.label)}</h1>
       <div class="annual-value">
-        <span>Valor aproximado anual para EPM</span>
-        <strong>${formatter.format(result.annualValue)}</strong>
+        <span>Valor aproximado para EPM</span>
+        <strong>${formatter.format(result.estimatedValue)}</strong>
       </div>
       <p>${escapeHtml(invitation)}</p>
     </section>
@@ -1634,6 +1698,7 @@ function resultsSidePanel(session) {
 }
 
 function digitalProfileResultsPanel(session, stats = computeStats(session)) {
+  const survey = digitalProfileConfig(session);
   return `
     <div class="panel results-side digital-results-side">
       <h2>Perfil digital</h2>
@@ -1650,7 +1715,7 @@ function digitalProfileResultsPanel(session, stats = computeStats(session)) {
         }).join("")}
       </div>
       <div class="digital-option-blocks">
-        ${digitalProfileSurvey.questions.map((question, qIndex) => `
+        ${survey.questions.map((question, qIndex) => `
           <div class="digital-option-block">
             <strong>${escapeHtml(question.text)}</strong>
             ${question.options.map((option, optionIndex) => `
@@ -1671,7 +1736,8 @@ function digitalProfileAnalysis(stats) {
   if (!stats.count) return "Aún no hay respuestas. Cuando empiecen a votar, aquí aparecerá la lectura de adopción digital por canales.";
   const digitalCount = (stats.profileCounts?.digital || 0) + (stats.profileCounts?.["very-digital"] || 0);
   const digitalShare = Math.round((digitalCount / stats.count) * 100);
-  const topQuestion = digitalProfileSurvey.questions
+  const survey = stats.survey || defaultDigitalProfileSurvey();
+  const topQuestion = survey.questions
     .map((question, qIndex) => {
       const counts = stats.optionCounts?.[qIndex] || [];
       const topIndex = counts.reduce((best, count, index) => count > counts[best] ? index : best, 0);
@@ -1818,7 +1884,7 @@ function liveResultsPanel(session) {
         </div>
         <div class="metric-card average-card ${isDigitalProfile ? "digital-average-card" : ""}">
           <div>
-            <p class="eyebrow">${session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" ? "Respuestas" : isDigitalProfile ? "Valor anual promedio" : "Promedio en vivo"}</p>
+            <p class="eyebrow">${session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" ? "Respuestas" : isDigitalProfile ? "Valor promedio" : "Promedio en vivo"}</p>
             <h1>${session.type === "wordcloud" ? stats.count : isDigitalProfile ? (stats.count ? annualFormatter.format(stats.average) : "--") : stats.count ? stats.average.toFixed(1) : "--"}</h1>
             <p>${stats.count} respuestas de ${Object.keys(session.participants).length} participantes</p>
           </div>
@@ -2071,6 +2137,16 @@ document.addEventListener("click", async (event) => {
     const options = question.querySelector(".quiz-options");
     options.insertAdjacentHTML("beforeend", quizOptionTemplate(qIndex, options.querySelectorAll(".quiz-option").length));
   }
+  if (action === "addDigitalProfileQuestion") {
+    const builder = document.querySelector("#digital-profile-builder");
+    builder.insertAdjacentHTML("beforeend", digitalProfileQuestionTemplate(builder.querySelectorAll(".digital-profile-question").length));
+  }
+  if (action === "addDigitalProfileOption") {
+    const question = event.target.closest(".digital-profile-question");
+    const qIndex = Number(question.dataset.digitalQuestionIndex);
+    const options = question.querySelector(".digital-profile-options");
+    options.insertAdjacentHTML("beforeend", digitalProfileOptionTemplate(qIndex, options.querySelectorAll(".digital-profile-option").length));
+  }
 });
 
 document.addEventListener("submit", async (event) => {
@@ -2086,8 +2162,13 @@ document.addEventListener("submit", async (event) => {
     const form = event.target;
     const type = new FormData(form).get("type");
     const questions = type === "quiz" ? parseQuizForm(form) : [];
+    const digitalProfileQuestions = type === DIGITAL_PROFILE_TYPE ? parseDigitalProfileForm(form) : [];
     if (type === "quiz" && !questions.length) {
       toast("Agrega al menos una pregunta para el quiz.");
+      return;
+    }
+    if (type === DIGITAL_PROFILE_TYPE && !digitalProfileQuestions.length) {
+      toast("Agrega al menos una pregunta para Perfil digital.");
       return;
     }
     await createSession({
@@ -2095,6 +2176,7 @@ document.addEventListener("submit", async (event) => {
       question: type === "quiz" ? "Quiz" : type === DIGITAL_PROFILE_TYPE ? digitalProfileSurvey.title : new FormData(form).get("question"),
       scaleMax: new FormData(form).get("scaleMax"),
       questions,
+      digitalProfileQuestions,
       durationMinutes: new FormData(form).get("durationMinutes")
     });
   }

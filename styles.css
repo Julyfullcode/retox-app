@@ -669,6 +669,8 @@ fieldset {
 
 .quiz-builder,
 .quiz-options,
+.digital-profile-builder,
+.digital-profile-options,
 .quiz-answer-form,
 .wordcloud-form {
   display: grid;
@@ -725,7 +727,8 @@ fieldset {
   flex-wrap: wrap;
 }
 
-.scale-config {
+.scale-config,
+.digital-profile-config {
   display: grid;
   gap: 12px;
 }
@@ -742,14 +745,16 @@ fieldset {
 }
 
 .field span,
-.quiz-option-head {
+.quiz-option-head,
+.digital-profile-option-head {
   font-size: 0.82rem;
   font-weight: 900;
   color: var(--blue);
 }
 
 .quiz-question,
-.quiz-answer-question {
+.quiz-answer-question,
+.digital-profile-question {
   display: grid;
   gap: 10px;
   border: 1px solid var(--line);
@@ -758,7 +763,8 @@ fieldset {
   min-width: 0;
 }
 
-.quiz-option-head {
+.quiz-option-head,
+.digital-profile-option-head {
   display: grid;
   grid-template-columns: minmax(170px, 1fr) minmax(92px, auto) 76px;
   gap: 8px;
@@ -769,7 +775,12 @@ fieldset {
   grid-column: 3;
 }
 
-.quiz-option {
+.digital-profile-option-head {
+  grid-template-columns: minmax(170px, 1fr) 120px;
+}
+
+.quiz-option,
+.digital-profile-option {
   display: grid;
   grid-template-columns: minmax(170px, 1fr) minmax(92px, auto) 76px;
   gap: 8px;
@@ -778,7 +789,12 @@ fieldset {
   font-size: 0.86rem;
 }
 
-.quiz-option input {
+.digital-profile-option {
+  grid-template-columns: minmax(170px, 1fr) 120px;
+}
+
+.quiz-option input,
+.digital-profile-option input {
   min-width: 0;
 }
 
@@ -910,21 +926,30 @@ fieldset {
   color: #fff;
 }
 
-.digital-result-art {
-  display: grid;
-  grid-template-columns: repeat(3, 48px);
+.digital-result-person {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  padding: 8px 14px 8px 8px;
 }
 
-.digital-result-art span {
-  height: 48px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.22);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32);
+.result-avatar {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.24);
+  font-size: 1.7rem;
 }
 
-.digital-result-art span:nth-child(2) {
-  background: rgba(182, 226, 58, 0.7);
+.digital-result-person strong {
+  color: #fff;
+  font-size: 1.08rem;
 }
 
 .annual-value {
@@ -949,7 +974,15 @@ fieldset {
 }
 
 .digital-results-side {
-  gap: 14px;
+  gap: 10px;
+  max-height: 72vh;
+  overflow: auto;
+  padding: 14px;
+}
+
+.digital-results-side h2 {
+  margin-bottom: 0;
+  font-size: 1rem;
 }
 
 .profile-bars,
@@ -964,7 +997,7 @@ fieldset {
   grid-template-columns: minmax(92px, 1fr) 34px minmax(74px, 1.2fr) 42px;
   gap: 8px;
   align-items: center;
-  font-size: 0.85rem;
+  font-size: 0.76rem;
   font-weight: 800;
 }
 
@@ -975,16 +1008,17 @@ fieldset {
 
 .digital-option-block {
   display: grid;
-  gap: 8px;
+  gap: 5px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 10px;
+  padding: 8px;
 }
 
 .digital-option-block > strong,
 .digital-analysis strong {
   color: var(--blue);
-  font-size: 0.88rem;
+  font-size: 0.74rem;
+  line-height: 1.15;
 }
 
 .digital-option-block span {
@@ -996,12 +1030,14 @@ fieldset {
 
 .digital-option-block small {
   color: var(--muted);
+  font-size: 0.68rem;
   font-weight: 800;
+  line-height: 1.15;
 }
 
 .digital-option-block b {
   color: var(--green);
-  font-size: 1.2rem;
+  font-size: 0.96rem;
 }
 
 .digital-analysis {
@@ -1013,9 +1049,9 @@ fieldset {
 .digital-analysis p {
   margin: 0;
   color: var(--ink);
-  font-size: 0.9rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.25;
 }
 
 .bar-wrap span {
@@ -1628,6 +1664,8 @@ footer {
   .setup-inline-fields,
   .profile-bar,
   .quiz-option,
+  .digital-profile-option,
+  .digital-profile-option-head,
   .quiz-option-head {
     grid-template-columns: 1fr;
   }
