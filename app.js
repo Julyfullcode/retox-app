@@ -669,7 +669,7 @@ async function submitDigitalProfile(event) {
   if (saved) {
     const { [appState.code]: _sentDraft, ...rest } = appState.digitalProfileDraft || {};
     appState.digitalProfileDraft = rest;
-    playDigitalProfileSound(result.profile.key);
+    if (["digital", "very-digital"].includes(result.profile.key)) playDigitalProfileSound(result.profile.key);
   }
   toast(saved ? "Perfil enviado." : "Tu perfil ya fue enviado.");
   render();
@@ -851,6 +851,10 @@ function surveyTypeLabel(type) {
   return "Escala";
 }
 
+function formatCop(value) {
+  return `$${new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(Number(value || 0))}`;
+}
+
 function excelWorkbook(sheets) {
   const sheetHtml = sheets
     .map(
@@ -952,10 +956,10 @@ function digitalProfileResult(session, answers = {}) {
 
 function digitalProfileForScore(score) {
   const value = Number(score || 0);
-  if (value <= 10000) return { key: "very-digital", label: "Muy digital", tone: "Conectado" };
-  if (value <= 35000) return { key: "digital", label: "Digital", tone: "En evolución" };
-  if (value <= 120000) return { key: "hybrid", label: "Híbrido", tone: "A medio camino" };
-  return { key: "traditional", label: "Tradicional", tone: "Listo para avanzar" };
+  if (value <= 10000) return { key: "very-digital", label: "Muy digital", tone: "Excelente avance" };
+  if (value <= 35000) return { key: "digital", label: "Digital", tone: "Vas muy bien" };
+  if (value <= 120000) return { key: "hybrid", label: "Hibrido", tone: "Gran oportunidad" };
+  return { key: "traditional", label: "Tradicional", tone: "Puedes dar el paso" };
 }
 
 function computeDigitalProfileStats(session) {
@@ -1584,17 +1588,17 @@ function digitalProfileParticipantView(session) {
 }
 
 function digitalProfileResultCard(result, user) {
-  const formatter = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
   const [, avatarLabel, avatarIcon] = avatarById(user?.avatar);
-  const costText = formatter.format(result.estimatedValue);
+  const costText = formatCop(result.estimatedValue);
+  const celebrate = ["digital", "very-digital"].includes(result.profile.key);
   const invitation = result.profile.key === "very-digital"
-    ? `Segun tus respuestas, al ano le estas generando a EPM un costo aproximado de ${costText}. Excelente: ya estas ayudando a que la atencion sea mas agil, simple y sostenible. Sigue usando EMA, factura web y pagos digitales; tu habito digital suma mucho.`
+    ? `Segun tus respuestas, cada 12 meses le generas a EPM un costo aproximado de ${costText}. Excelente: ya estas ayudando a que la atencion sea mas agil, simple y sostenible. Sigue usando EMA, factura web y pagos digitales; tu habito digital suma mucho.`
     : result.profile.key === "digital"
-      ? `Segun tus respuestas, al ano le estas generando a EPM un costo aproximado de ${costText}. Vas muy bien: con uno o dos pasos mas hacia EMA, factura web o pagos digitales puedes ahorrar tiempo y hacer cada tramite mas facil.`
-      : `Segun tus respuestas, al ano le estas generando a EPM un costo aproximado de ${costText}. Hoy tienes una oportunidad enorme para ganar tiempo y evitar filas: prueba un canal digital en tu proximo contacto y descubre una forma mas rapida de resolver.`;
+      ? `Segun tus respuestas, cada 12 meses le generas a EPM un costo aproximado de ${costText}. Vas muy bien: con uno o dos pasos mas hacia EMA, factura web o pagos digitales puedes ahorrar tiempo y hacer cada tramite mas facil.`
+      : `Segun tus respuestas, cada 12 meses le generas a EPM un costo aproximado de ${costText}. Hoy tienes una oportunidad enorme para ganar tiempo y evitar filas: prueba un canal digital en tu proximo contacto y descubre una forma mas rapida de resolver.`;
   return `
     <section class="digital-result-card ${result.profile.key}">
-      <div class="celebration" aria-hidden="true">
+      ${celebrate ? `<div class="celebration" aria-hidden="true">
         <span class="balloon b1"></span>
         <span class="balloon b2"></span>
         <span class="balloon b3"></span>
@@ -1603,7 +1607,7 @@ function digitalProfileResultCard(result, user) {
         <span class="confetti c3"></span>
         <span class="confetti c4"></span>
         <span class="confetti c5"></span>
-      </div>
+      </div>` : ""}
       <div class="digital-result-person">
         <span class="result-avatar" title="${escapeHtml(avatarLabel)}">${avatarIcon}</span>
         <strong>${escapeHtml(user?.name || "Participante")}</strong>
@@ -1612,7 +1616,7 @@ function digitalProfileResultCard(result, user) {
       <h1>${escapeHtml(result.profile.label)}</h1>
       <div class="annual-value">
         <span>Costo estimado anual para EPM</span>
-        <strong>${formatter.format(result.estimatedValue)}</strong>
+        <strong>${costText}</strong>
       </div>
       <p>${escapeHtml(invitation)}</p>
     </section>
@@ -1890,7 +1894,6 @@ function liveResultsPanel(session) {
   const people = votedPeople(session).slice(-5);
   const links = sessionLinks(session.code);
   const isDigitalProfile = session.type === DIGITAL_PROFILE_TYPE;
-  const annualFormatter = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
   return `
     <div class="results-stage">
       <h2 class="live-question">${escapeHtml(session.question)}</h2>
@@ -1908,7 +1911,7 @@ function liveResultsPanel(session) {
         <div class="metric-card average-card ${isDigitalProfile ? "digital-average-card" : ""}">
           <div>
             <p class="eyebrow">${session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" ? "Respuestas" : isDigitalProfile ? "Valor promedio" : "Promedio en vivo"}</p>
-            <h1>${session.type === "wordcloud" ? stats.count : isDigitalProfile ? (stats.count ? annualFormatter.format(stats.average) : "--") : stats.count ? stats.average.toFixed(1) : "--"}</h1>
+            <h1>${session.type === "wordcloud" ? stats.count : isDigitalProfile ? (stats.count ? formatCop(stats.average) : "--") : stats.count ? stats.average.toFixed(1) : "--"}</h1>
             <p>${stats.count} respuestas de ${Object.keys(session.participants).length} participantes</p>
           </div>
           ${isDigitalProfile ? `<div class="digital-average-analysis"><strong>Analisis</strong><p>${escapeHtml(digitalProfileAverageAnalysis(stats))}</p></div>` : ""}

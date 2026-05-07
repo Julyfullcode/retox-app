@@ -906,7 +906,6 @@ fieldset {
   color: #fff;
   text-align: center;
   box-shadow: var(--shadow);
-  animation: result-pop 0.7s ease both;
 }
 
 .digital-result-card h1 {
@@ -1013,7 +1012,6 @@ fieldset {
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.24);
   font-size: 1.7rem;
-  animation: avatar-bounce 0.75s ease 0.15s both;
 }
 
 .digital-result-person strong {
@@ -1316,8 +1314,10 @@ fieldset {
 
 .results-stage .digital-average-card h1 {
   max-width: 100%;
-  font-size: clamp(1.8rem, 4.2vw, 3.4rem);
-  overflow-wrap: anywhere;
+  font-size: clamp(1.65rem, 3.5vw, 3rem);
+  line-height: 1;
+  overflow-wrap: normal;
+  white-space: nowrap;
 }
 
 .results-stage .digital-average-card {
@@ -1703,29 +1703,6 @@ footer {
   from {
     opacity: 0;
     transform: translateY(10px);
-  }
-}
-
-@keyframes result-pop {
-  from {
-    opacity: 0;
-    transform: translateY(16px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes avatar-bounce {
-  0% {
-    transform: scale(0.6);
-  }
-  60% {
-    transform: scale(1.12);
-  }
-  100% {
-    transform: scale(1);
   }
 }
 
