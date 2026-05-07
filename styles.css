@@ -455,11 +455,27 @@ fieldset {
   font-size: 1.25rem;
 }
 
+.person-text {
+  display: grid;
+  min-width: 0;
+}
+
 .person-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 900;
+}
+
+.person-detail {
+  overflow: hidden;
+  color: rgba(21, 37, 31, 0.72);
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1.05;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .edit-person {
@@ -1344,6 +1360,20 @@ fieldset {
 
 .live-voters .person-chip {
   max-width: 140px;
+}
+
+.digital-live-voters {
+  flex-wrap: wrap;
+  align-content: start;
+  max-height: none;
+  min-height: 56px;
+  overflow: visible;
+}
+
+.digital-live-voters .person-chip {
+  min-height: 50px;
+  max-width: 176px;
+  padding-right: 12px;
 }
 
 .waiting-votes {

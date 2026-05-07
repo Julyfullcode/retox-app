@@ -1009,7 +1009,7 @@ function avatarById(id) {
   return avatars.find(([avatarId]) => avatarId === id) || avatars[0];
 }
 
-function personChip(person, extra = "", action = "") {
+function personChip(person, extra = "", action = "", detail = "") {
   if (!person) return "";
   const [, label, icon, color] = avatarById(person.avatar);
   const tag = action ? "button" : "div";
@@ -1017,7 +1017,10 @@ function personChip(person, extra = "", action = "") {
   return `
     <${tag} class="person-chip ${extra}" style="--avatar-bg:${color}" title="${escapeHtml(label)}"${actionAttrs}>
       <span class="person-avatar" aria-hidden="true">${icon}</span>
-      <span class="person-name">${escapeHtml(person.name)}</span>
+      <span class="person-text">
+        <span class="person-name">${escapeHtml(person.name)}</span>
+        ${detail ? `<small class="person-detail">${escapeHtml(detail)}</small>` : ""}
+      </span>
     </${tag}>
   `;
 }
@@ -1027,6 +1030,11 @@ function votedPeople(session) {
     .map(([userId, vote]) => ({ id: userId, name: "Participante", avatar: avatars[0][0], ...(session.participants[userId] || {}), vote }))
     .filter((person) => person.id)
     .sort((a, b) => a.vote.at - b.vote.at);
+}
+
+function digitalProfilePersonChip(session, person) {
+  const result = digitalProfileResult(session, person.vote?.answers || {});
+  return personChip(person, "digital-person-chip", "", result.profile.label);
 }
 
 function logo() {
@@ -1892,9 +1900,9 @@ function inviteView(session) {
 
 function liveResultsPanel(session) {
   const stats = computeStats(session);
-  const people = votedPeople(session).slice(-5);
-  const links = sessionLinks(session.code);
   const isDigitalProfile = session.type === DIGITAL_PROFILE_TYPE;
+  const people = isDigitalProfile ? votedPeople(session) : votedPeople(session).slice(-5);
+  const links = sessionLinks(session.code);
   return `
     <div class="results-stage">
       <h2 class="live-question">${escapeHtml(session.question)}</h2>
@@ -1919,10 +1927,10 @@ function liveResultsPanel(session) {
           ${session.type === "quiz" || session.type === "wordcloud" || isDigitalProfile ? "" : thermometer(stats.average, true)}
         </div>
       </div>
-      <div class="live-voters" aria-live="polite">
+      <div class="live-voters ${isDigitalProfile ? "digital-live-voters" : ""}" aria-live="polite">
         ${
           people.length
-            ? people.map((person) => personChip(person)).join("")
+            ? people.map((person) => isDigitalProfile ? digitalProfilePersonChip(session, person) : personChip(person)).join("")
             : `<p class="waiting-votes">Aun no hay votos registrados</p>`
         }
       </div>
@@ -2288,13 +2296,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v45")) return;
-    sessionStorage.setItem("retox.swReloaded.v45", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v46")) return;
+    sessionStorage.setItem("retox.swReloaded.v46", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=45", { updateViaCache: "none" })
+    .register("./sw.js?v=46", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })
