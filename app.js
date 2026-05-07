@@ -956,10 +956,10 @@ function digitalProfileResult(session, answers = {}) {
 
 function digitalProfileForScore(score) {
   const value = Number(score || 0);
-  if (value <= 10000) return { key: "very-digital", label: "Muy digital", tone: "Excelente avance" };
+  if (value <= 10000) return { key: "very-digital", label: "Muy digital", tone: "Estás haciendo una gran gestión" };
   if (value <= 35000) return { key: "digital", label: "Digital", tone: "Vas muy bien" };
-  if (value <= 120000) return { key: "hybrid", label: "Hibrido", tone: "Gran oportunidad" };
-  return { key: "traditional", label: "Tradicional", tone: "Puedes dar el paso" };
+  if (value <= 120000) return { key: "hybrid", label: "Híbrido", tone: "Tienes una gran oportunidad" };
+  return { key: "traditional", label: "Tradicional", tone: "Puedes dar un gran paso" };
 }
 
 function computeDigitalProfileStats(session) {
@@ -1591,11 +1591,12 @@ function digitalProfileResultCard(result, user) {
   const [, avatarLabel, avatarIcon] = avatarById(user?.avatar);
   const costText = formatCop(result.estimatedValue);
   const celebrate = ["digital", "very-digital"].includes(result.profile.key);
-  const invitation = result.profile.key === "very-digital"
-    ? `Segun tus respuestas, cada 12 meses le generas a EPM un costo aproximado de ${costText}. Excelente: ya estas ayudando a que la atencion sea mas agil, simple y sostenible. Sigue usando EMA, factura web y pagos digitales; tu habito digital suma mucho.`
+  const costMessage = `Según tus respuestas, cada 12 meses le generas a EPM un costo aproximado de ${costText}.`;
+  const motivation = result.profile.key === "very-digital"
+    ? "Excelente: ya estás ayudando a que la atención sea más ágil, simple y sostenible. Sigue usando EMA, factura web y pagos digitales; tu hábito digital suma mucho."
     : result.profile.key === "digital"
-      ? `Segun tus respuestas, cada 12 meses le generas a EPM un costo aproximado de ${costText}. Vas muy bien: con uno o dos pasos mas hacia EMA, factura web o pagos digitales puedes ahorrar tiempo y hacer cada tramite mas facil.`
-      : `Segun tus respuestas, cada 12 meses le generas a EPM un costo aproximado de ${costText}. Hoy tienes una oportunidad enorme para ganar tiempo y evitar filas: prueba un canal digital en tu proximo contacto y descubre una forma mas rapida de resolver.`;
+      ? "Vas muy bien: con uno o dos pasos más hacia EMA, factura web o pagos digitales puedes ahorrar tiempo y hacer cada trámite más fácil."
+      : "Hoy tienes una oportunidad enorme para ganar tiempo y evitar filas: prueba un canal digital en tu próximo contacto y descubre una forma más rápida de resolver.";
   return `
     <section class="digital-result-card ${result.profile.key}">
       ${celebrate ? `<div class="celebration" aria-hidden="true">
@@ -1618,7 +1619,7 @@ function digitalProfileResultCard(result, user) {
         <span>Costo estimado anual para EPM</span>
         <strong>${costText}</strong>
       </div>
-      <p>${escapeHtml(invitation)}</p>
+      <p class="result-message"><span>${escapeHtml(costMessage)}</span><span>${escapeHtml(motivation)}</span></p>
     </section>
   `;
 }
@@ -1770,9 +1771,9 @@ function digitalProfileAverageAnalysis(stats) {
   const digitalCount = (stats.profileCounts?.digital || 0) + (stats.profileCounts?.["very-digital"] || 0);
   const digitalShare = Math.round((digitalCount / stats.count) * 100);
   const traditionalShare = Math.round(((stats.profileCounts?.traditional || 0) / stats.count) * 100);
-  if (traditionalShare >= 40) return `${traditionalShare}% esta en perfil Tradicional. La mayor oportunidad esta en mover atencion y pagos hacia canales digitales.`;
-  if (digitalShare >= 60) return `${digitalShare}% ya esta en perfiles Digital o Muy digital. Conviene reforzar EMA, factura web y pagos digitales para sostener el avance.`;
-  return `${digitalShare}% esta en perfiles Digital o Muy digital. Hay una mezcla de habitos: buen momento para invitar a migrar los canales mas costosos.`;
+  if (traditionalShare >= 40) return `${traditionalShare}% está en perfil Tradicional. La mayor oportunidad está en mover atención y pagos hacia canales digitales.`;
+  if (digitalShare >= 60) return `${digitalShare}% ya está en perfiles Digital o Muy digital. Conviene reforzar EMA, factura web y pagos digitales para sostener el avance.`;
+  return `${digitalShare}% está en perfiles Digital o Muy digital. Hay una mezcla de hábitos: buen momento para invitar a migrar los canales más costosos.`;
 }
 
 function wordCloudVisual(words) {

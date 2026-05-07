@@ -989,6 +989,11 @@ fieldset {
   font-weight: 800;
 }
 
+.result-message {
+  display: grid;
+  gap: 8px;
+}
+
 .digital-result-card .eyebrow {
   color: #fff;
 }
