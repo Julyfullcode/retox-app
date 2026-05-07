@@ -2276,11 +2276,33 @@ window.addEventListener("storage", () => {
   render();
 });
 
+async function clearBrowserCaches() {
+  if (!("caches" in window)) return;
+  try {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((key) => caches.delete(key)));
+  } catch {
+    // Cache cleanup is best-effort; realtime data still loads from Supabase.
+  }
+}
+
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js").catch(() => {});
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (sessionStorage.getItem("retox.swReloaded.v45")) return;
+    sessionStorage.setItem("retox.swReloaded.v45", "1");
+    location.reload();
+  });
+
+  navigator.serviceWorker
+    .register("./sw.js?v=45", { updateViaCache: "none" })
+    .then((registration) => {
+      registration.update().catch(() => {});
+    })
+    .catch(() => {});
 }
 
 async function initApp() {
+  await clearBrowserCaches();
   await loadRemoteSessions();
   subscribeToRemoteSessions();
   render();
