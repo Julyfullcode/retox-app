@@ -859,7 +859,7 @@ function exportSessionResults(session) {
         ["Analisis"],
         ...(stats.analysis || []).map((item) => [item]),
         [],
-        ["Tema representativo", "Menciones", "Detalle"],
+        ["Tema representativo", "Respuestas asociadas", "Lectura"],
         ...(stats.themes || []).map((theme) => [theme.label, theme.count, theme.detail]),
         [],
         ["Acciones sugeridas"],
@@ -1026,75 +1026,86 @@ function computeFreeTextStats(session) {
 }
 
 function freeTextThemes(responses) {
-  const counts = new Map();
-  responses.forEach((text) => {
-    meaningfulPhrases(text).forEach((phrase) => {
-      const key = normalizePhrase(phrase);
-      if (!key) return;
-      const current = counts.get(key) || { label: phrase, count: 0 };
-      counts.set(key, { ...current, count: current.count + 1 });
-    });
+  const categories = [
+    {
+      key: "commercial",
+      label: "Ampliacion del foco comercial",
+      detail: "Las respuestas apuntan a fortalecer la mirada comercial, ampliar oportunidades y conectar mejor la propuesta con necesidades del negocio.",
+      keywords: ["comercial", "mercado", "cliente", "clientes", "venta", "ventas", "negocio", "oferta", "foco", "ampliar", "oportunidad", "oportunidades"]
+    },
+    {
+      key: "capabilities",
+      label: "Validacion de capacidades y dimensionamiento",
+      detail: "Se identifica la necesidad de revisar capacidades, alcance, recursos y dimensionamiento antes de avanzar.",
+      keywords: ["capacidad", "capacidades", "dimensionamiento", "dimensionar", "alcance", "recursos", "recurso", "equipo", "validar", "viabilidad", "carga"]
+    },
+    {
+      key: "experience",
+      label: "Experiencia y valor para el grupo",
+      detail: "Los aportes resaltan el valor de la experiencia, el aprendizaje colectivo y la contribucion al grupo.",
+      keywords: ["experiencia", "grupo", "aporte", "aportes", "valor", "valioso", "aprendizaje", "participacion", "dinamica", "ejercicio"]
+    },
+    {
+      key: "clarity",
+      label: "Claridad y alineacion",
+      detail: "Aparece la necesidad de alinear expectativas, precisar mensajes y dejar mas claro el camino de trabajo.",
+      keywords: ["claro", "clara", "claridad", "alinear", "alineacion", "mensaje", "mensajes", "instrucciones", "entender", "explicar"]
+    },
+    {
+      key: "followup",
+      label: "Seguimiento y compromisos",
+      detail: "Las respuestas sugieren cerrar con compromisos, responsables y continuidad para que las ideas se traduzcan en accion.",
+      keywords: ["seguimiento", "compromiso", "compromisos", "responsable", "responsables", "accion", "acciones", "continuidad", "cerrar", "implementar"]
+    },
+    {
+      key: "improvement",
+      label: "Oportunidades de mejora",
+      detail: "Se observan oportunidades para ajustar el proceso, mejorar la ejecucion y fortalecer el resultado esperado.",
+      keywords: ["mejorar", "mejora", "oportunidad", "oportunidades", "ajustar", "fortalecer", "trabajar", "profundizar", "desarrollar"]
+    }
+  ];
+
+  const scored = categories.map((category) => {
+    const count = responses.filter((text) => {
+      const words = new Set(extractWords(text, 160));
+      return category.keywords.some((keyword) => words.has(keyword));
+    }).length;
+    return { ...category, count };
   });
-  return [...counts.values()]
-    .filter((theme) => theme.label.split(/\s+/).length >= 2)
+
+  const detected = scored
+    .filter((theme) => theme.count > 0)
     .sort((a, b) => b.count - a.count || b.label.length - a.label.length)
-    .slice(0, 5)
-    .map((theme) => ({
-      ...theme,
-      detail: theme.count > 1
-        ? "Aparece como una idea repetida en varias respuestas."
-        : "Surge como una idea concreta dentro de las respuestas."
-    }));
-}
+    .slice(0, 4);
 
-function meaningfulPhrases(text) {
-  return String(text || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[.!?;:()]/g, ",")
-    .split(/,|\bpero\b|\bademas\b|\btambien\b|\by\b/)
-    .map((part) => cleanFreeTextPhrase(part))
-    .filter((phrase) => phrase.split(/\s+/).length >= 2)
-    .slice(0, 8);
-}
-
-function cleanFreeTextPhrase(value) {
-  return String(value || "")
-    .replace(/[^a-z0-9\u00f1\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/^(me parece|considero|creo que|pienso que|opino que)\s+/i, "")
-    .replace(/^(es|seria|resulta|queda|fue)\s+/i, "")
-    .replace(/^(un|una|el|la|los|las)\s+/i, "")
-    .replace(/^(se debe|debe|deben|hay que|importante|es importante)\s+/i, "")
-    .replace(/^(seguir|continuar|trabajar|trabajando)\s+(en\s+)?/i, "")
-    .trim();
-}
-
-function normalizePhrase(value) {
-  const words = extractWords(value, 12).filter((word) => !["ademas", "agregado", "aporta", "aporte"].includes(word));
-  return words.length >= 2 ? words.join(" ") : "";
+  if (detected.length) return detected;
+  if (!responses.length) return [];
+  return [{
+    key: "general",
+    label: "Insumos cualitativos generales",
+    count: responses.length,
+    detail: "Las respuestas entregan percepciones utiles, pero aun no forman una tendencia tematica clara."
+  }];
 }
 
 function freeTextSummary(responses, themes) {
   if (!responses.length) return "Aun no hay respuestas. Cuando empiecen a llegar, aqui aparecera un resumen automatico de los temas principales.";
   if (!themes.length) return `Hay ${responses.length} respuestas registradas, pero todavia no hay un patron repetido claro. Conviene leerlas como insumos exploratorios y esperar mas participacion.`;
-  const themeText = themes.slice(0, 3).map((theme) => theme.label).join(", ");
-  return `En ${responses.length} respuestas, la lectura principal se concentra en ${themeText}. Estos puntos sintetizan las ideas accionables mas visibles frente a la pregunta.`;
+  const themeText = themes.slice(0, 3).map((theme) => theme.label.toLowerCase()).join(", ");
+  return `A partir de ${responses.length} respuestas, la lectura ejecutiva se concentra en ${themeText}. El resultado sintetiza las tendencias principales sin transcribir literalmente los comentarios.`;
 }
 
 function freeTextAnalysis(responses, themes) {
   if (!responses.length) return ["El analisis aparecera cuando lleguen las primeras respuestas."];
   if (!themes.length) return ["Las respuestas son variadas y aun no forman una tendencia dominante.", "Se recomienda esperar mas participacion antes de sacar conclusiones."];
-  return themes.slice(0, 3).map((theme) => `${capitalize(theme.label)} aparece en ${theme.count} menciones. ${theme.detail}`);
+  return themes.slice(0, 3).map((theme) => `${theme.label}: ${theme.detail}`);
 }
 
 function freeTextRecommendations(themes) {
   if (!themes.length) return ["Recoger mas respuestas para identificar patrones con mayor confianza."];
   return [
-    `Profundizar en ${themes[0].label} con una pregunta de seguimiento.`,
-    themes[1] ? `Validar si ${themes[0].label} y ${themes[1].label} requieren una accion conjunta.` : "Identificar responsables y alcance para el tema principal.",
+    `Profundizar en ${themes[0].label.toLowerCase()} con una pregunta de seguimiento.`,
+    themes[1] ? `Validar si ${themes[0].label.toLowerCase()} y ${themes[1].label.toLowerCase()} requieren una accion conjunta.` : "Identificar responsables y alcance para el tema principal.",
     "Cerrar la conversacion con compromisos concretos y responsables visibles."
   ];
 }
@@ -2658,13 +2669,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v56")) return;
-    sessionStorage.setItem("retox.swReloaded.v56", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v57")) return;
+    sessionStorage.setItem("retox.swReloaded.v57", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=56", { updateViaCache: "none" })
+    .register("./sw.js?v=57", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })

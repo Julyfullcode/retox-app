@@ -1,4 +1,4 @@
-const CACHE_NAME = "retox-v56";
+const CACHE_NAME = "retox-v57";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
