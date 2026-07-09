@@ -40,6 +40,7 @@ const avatars = [
 const sampleNames = ["Ana", "Luis", "Mafe", "Carlos", "Sofi", "Juli", "Diana", "Mateo"];
 const defaultQuestion = "Del 1 al 10, ¿como calificas esta experiencia?";
 const DIGITAL_PROFILE_TYPE = "digitalprofile";
+const FREE_TEXT_TYPE = "freetext";
 const digitalProfileSurvey = {
   title: "Perfil digital",
   questions: [
@@ -84,7 +85,8 @@ let appState = {
   hostSection: "menu",
   surveyType: "scale",
   digitalProfileDraft: {},
-  wordCloudDraft: {}
+  wordCloudDraft: {},
+  freeTextDraft: {}
 };
 
 function uid() {
@@ -357,6 +359,10 @@ async function saveWordCloudVote(code, user, text, round) {
   return saveVoteRow(code, user, { type: "wordcloud", answers: { text, words: extractWords(text) }, round });
 }
 
+async function saveFreeTextVote(code, user, text, round) {
+  return saveVoteRow(code, user, { type: FREE_TEXT_TYPE, answers: { text }, round });
+}
+
 async function saveDigitalProfileVote(code, user, answers, score, round) {
   return saveVoteRow(code, user, { type: DIGITAL_PROFILE_TYPE, answers, score, round });
 }
@@ -514,7 +520,7 @@ async function createSession(options = {}) {
   const code = sessionCode();
   const now = Date.now();
   const durationMinutes = Math.max(1, Number(options.durationMinutes || 10));
-  const type = ["quiz", "wordcloud", DIGITAL_PROFILE_TYPE].includes(options.type) ? options.type : "scale";
+  const type = ["quiz", "wordcloud", FREE_TEXT_TYPE, DIGITAL_PROFILE_TYPE].includes(options.type) ? options.type : "scale";
   const session = {
     code,
     createdAt: now,
@@ -524,6 +530,7 @@ async function createSession(options = {}) {
     quiz: type === "quiz" ? { questions: options.questions || [] } : null,
     digitalProfile: type === DIGITAL_PROFILE_TYPE ? { title: digitalProfileSurvey.title, questions: options.digitalProfileQuestions || defaultDigitalProfileSurvey().questions } : null,
     wordCloud: type === "wordcloud" ? { maxWords: 3 } : null,
+    freeText: type === FREE_TEXT_TYPE ? { analysis: true } : null,
     durationMinutes,
     expiresAt: now + durationMinutes * 60 * 1000,
     participants: {},
@@ -641,6 +648,31 @@ async function submitWordCloud(event) {
   render();
 }
 
+async function submitFreeText(event) {
+  event.preventDefault();
+  if (!appState.user) return;
+  const current = await fetchSessionConfig(appState.code) || getSession(appState.code);
+  if (isSessionClosed(current)) {
+    toast("La encuesta ya esta cerrada.");
+    render();
+    return;
+  }
+  if (current.votes?.[appState.user.id]) {
+    toast("Tu respuesta ya fue enviada.");
+    render();
+    return;
+  }
+  const text = String(new FormData(event.target).get("freeTextAnswer") || "").trim();
+  if (text.length < 8) {
+    toast("Escribe una respuesta un poco mas completa.");
+    return;
+  }
+  const saved = await saveFreeTextVote(appState.code, appState.user, text, current.round);
+  if (saved) clearFreeTextDraft(appState.code);
+  toast(saved ? "Respuesta enviada." : "Tu respuesta ya fue enviada.");
+  render();
+}
+
 async function submitDigitalProfile(event) {
   event.preventDefault();
   if (!appState.user) return;
@@ -706,6 +738,16 @@ async function addDemoVotes() {
       if (session.type === "wordcloud") {
         const samples = ["experiencia digital", "servicio cercano", "social media", "innovación cliente", "confianza", "rapidez"];
         await saveWordCloudVote(appState.code, user, samples[index % samples.length], session.round);
+      } else if (session.type === FREE_TEXT_TYPE) {
+        const samples = [
+          "La experiencia fue clara y cercana, pero seria bueno tener mas acompanamiento al inicio.",
+          "Me gusto la dinamica porque permite expresar ideas y escuchar a otros participantes.",
+          "El punto mas importante es mejorar la velocidad de respuesta y dar instrucciones mas simples.",
+          "La actividad ayuda a identificar oportunidades, especialmente en comunicacion y seguimiento.",
+          "Seria valioso cerrar con compromisos concretos para que las ideas no se pierdan.",
+          "Destaco la participacion del grupo y la posibilidad de compartir opiniones sin complicaciones."
+        ];
+        await saveFreeTextVote(appState.code, user, samples[index % samples.length], session.round);
       } else if (session.type === DIGITAL_PROFILE_TYPE) {
         const samples = [
           { 0: 0, 1: 2, 2: 1 },
@@ -770,7 +812,7 @@ function exportSessionResults(session) {
       participant.name,
       avatar[1],
       session.type === "quiz" ? vote?.score ?? "" : session.type === DIGITAL_PROFILE_TYPE ? digitalResult?.estimatedValue ?? "" : vote?.value ?? "",
-      session.type === "wordcloud" ? vote?.answers?.text ?? "" : "",
+      session.type === "wordcloud" || session.type === FREE_TEXT_TYPE ? vote?.answers?.text ?? "" : "",
       digitalResult?.profile.label || "",
       vote?.at ? new Date(vote.at).toLocaleString("es-CO") : "",
       session.question,
@@ -788,12 +830,12 @@ function exportSessionResults(session) {
         ["Codigo", session.code],
         ["Tipo", surveyTypeLabel(session.type)],
         ["Pregunta", session.question],
-        [session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" ? "Respuestas" : session.type === DIGITAL_PROFILE_TYPE ? "Valor promedio" : "Promedio", stats.count ? stats.average.toFixed(2) : ""],
+        [session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" || session.type === FREE_TEXT_TYPE ? "Respuestas" : session.type === DIGITAL_PROFILE_TYPE ? "Valor promedio" : "Promedio", stats.count ? stats.average.toFixed(2) : ""],
         ["Participantes", participants.length],
         ["Respuestas", stats.count],
         ...(session.type === "quiz" ? [["Puntaje maximo", stats.maxScore]] : []),
         [],
-        ["Nombre", "Avatar", session.type === "quiz" ? "Puntaje" : session.type === DIGITAL_PROFILE_TYPE ? "Valor estimado" : "Voto", "Texto nube", "Perfil digital", "Fecha respuesta", "Pregunta", "Codigo sesion", "Ronda"],
+        ["Nombre", "Avatar", session.type === "quiz" ? "Puntaje" : session.type === DIGITAL_PROFILE_TYPE ? "Valor estimado" : "Voto", session.type === FREE_TEXT_TYPE ? "Texto libre" : "Texto nube", "Perfil digital", "Fecha respuesta", "Pregunta", "Codigo sesion", "Ronda"],
         ...rows
       ]
     },
@@ -808,6 +850,19 @@ function exportSessionResults(session) {
     }] : session.type === "wordcloud" ? [{
       name: "Nube",
       rows: [["Palabra", "Cantidad"], ...(stats.words || []).map((word) => [word.text, word.count])]
+    }] : session.type === FREE_TEXT_TYPE ? [{
+      name: "Analisis textos",
+      rows: [
+        ["Resumen", stats.summary || ""],
+        ["Respuestas", stats.count],
+        ["Promedio palabras", stats.averageLength || 0],
+        [],
+        ["Tema", "Cantidad"],
+        ...(stats.keywords || []).map((word) => [word.text, word.count]),
+        [],
+        ["Respuestas representativas"],
+        ...(stats.representative || []).map((text) => [text])
+      ]
     }] : session.type === DIGITAL_PROFILE_TYPE ? [{
       name: "Perfil digital",
       rows: [
@@ -849,6 +904,7 @@ function exportResults() {
 function surveyTypeLabel(type) {
   if (type === "quiz") return "Quiz";
   if (type === "wordcloud") return "Nube de palabras";
+  if (type === FREE_TEXT_TYPE) return "Texto libre";
   if (type === DIGITAL_PROFILE_TYPE) return "Perfil digital";
   return "Escala";
 }
@@ -879,6 +935,7 @@ function excelWorkbook(sheets) {
 }
 
 function computeStats(session) {
+  if (session?.type === FREE_TEXT_TYPE) return computeFreeTextStats(session);
   if (session?.type === "wordcloud") return computeWordCloudStats(session);
   if (session?.type === "quiz") return computeQuizStats(session);
   if (session?.type === DIGITAL_PROFILE_TYPE) return computeDigitalProfileStats(session);
@@ -913,7 +970,7 @@ function computeQuizStats(session) {
   return { average, count, distribution: [], max: 1, maxScore: maxQuizScore(session), scores };
 }
 
-function extractWords(text) {
+function extractWords(text, limit = 8) {
   const stopWords = new Set([
     "a", "al", "algo", "ante", "asi", "como", "con", "contra", "cual", "cuando", "de", "del", "desde", "donde",
     "e", "el", "ella", "ellas", "ellos", "en", "entre", "era", "eres", "es", "esa", "esas", "ese", "eso", "esos",
@@ -929,7 +986,7 @@ function extractWords(text) {
     .split(/\s+/)
     .map((word) => word.trim())
     .filter((word) => word.length > 2 && !stopWords.has(word))
-    .slice(0, 8);
+    .slice(0, limit);
 }
 
 function computeWordCloudStats(session) {
@@ -944,6 +1001,53 @@ function computeWordCloudStats(session) {
     .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text))
     .slice(0, 34);
   return { average: votes.length, count: votes.length, distribution: [], max: Math.max(1, ...words.map((word) => word.count)), words };
+}
+
+function computeFreeTextStats(session) {
+  const responses = Object.values(session?.votes || {})
+    .map((vote) => String(vote.answers?.text || "").trim())
+    .filter(Boolean);
+  const counts = new Map();
+  responses.forEach((text) => {
+    extractWords(text, 120).forEach((word) => counts.set(word, (counts.get(word) || 0) + 1));
+  });
+  const keywords = [...counts.entries()]
+    .map(([text, count]) => ({ text, count }))
+    .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text))
+    .slice(0, 12);
+  const representative = responses
+    .map((text) => ({ text, score: extractWords(text, 120).reduce((sum, word) => sum + (counts.get(word) || 0), 0) }))
+    .sort((a, b) => b.score - a.score || b.text.length - a.text.length)
+    .slice(0, 3)
+    .map((item) => item.text);
+  const averageLength = responses.length
+    ? Math.round(responses.reduce((sum, text) => sum + text.split(/\s+/).filter(Boolean).length, 0) / responses.length)
+    : 0;
+  return {
+    average: responses.length,
+    count: responses.length,
+    distribution: [],
+    max: Math.max(1, ...keywords.map((word) => word.count)),
+    responses,
+    keywords,
+    representative,
+    averageLength,
+    summary: freeTextSummary(responses, keywords, representative)
+  };
+}
+
+function freeTextSummary(responses, keywords, representative) {
+  if (!responses.length) return "Aun no hay respuestas. Cuando empiecen a llegar, aqui aparecera un resumen automatico de los temas principales.";
+  const top = keywords.slice(0, 5).map((word) => word.text);
+  const themeText = top.length ? top.join(", ") : "sin temas repetidos claros";
+  const sample = representative[0] ? ` Una respuesta representativa menciona: "${shortText(representative[0], 140)}".` : "";
+  if (responses.length === 1) return `Hay una respuesta registrada. El tema principal detectado es ${themeText}.${sample}`;
+  return `En ${responses.length} respuestas, los temas mas repetidos son ${themeText}. La lectura general muestra coincidencias alrededor de esas ideas y permite priorizar mensajes o acciones sobre lo que mas se repite.${sample}`;
+}
+
+function shortText(text, maxLength = 120) {
+  const clean = String(text || "").replace(/\s+/g, " ").trim();
+  return clean.length > maxLength ? `${clean.slice(0, maxLength - 1).trim()}...` : clean;
 }
 
 function digitalProfileConfig(session) {
@@ -1120,7 +1224,7 @@ function hostSetupView() {
       <section class="host-portal">
         <form class="panel setup-panel" data-action="createSessionForm">
           <p class="eyebrow">Crear sesión</p>
-          <h1>${appState.surveyType === "quiz" ? "Nuevo quiz" : appState.surveyType === "wordcloud" ? "Nueva nube de palabras" : appState.surveyType === DIGITAL_PROFILE_TYPE ? "Nuevo Perfil digital" : "Nueva escala"}</h1>
+          <h1>${appState.surveyType === "quiz" ? "Nuevo quiz" : appState.surveyType === "wordcloud" ? "Nueva nube de palabras" : appState.surveyType === FREE_TEXT_TYPE ? "Nuevo texto libre" : appState.surveyType === DIGITAL_PROFILE_TYPE ? "Nuevo Perfil digital" : "Nueva escala"}</h1>
           <input type="hidden" name="type" value="${appState.surveyType}" />
           ${
             appState.surveyType === "quiz"
@@ -1136,6 +1240,13 @@ function hostSetupView() {
                     <label for="setup-question">Pregunta</label>
                     <textarea id="setup-question" name="question" rows="3">Escribe una palabra o frase corta que represente esta experiencia</textarea>
                     <label for="setup-duration">Tiempo máximo de vigencia en minutos</label>
+                    <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
+                  </div>`
+                : appState.surveyType === FREE_TEXT_TYPE
+                  ? `<div class="scale-config">
+                    <label for="setup-question">Pregunta</label>
+                    <textarea id="setup-question" name="question" rows="3">Comparte tu opiniÃ³n sobre esta experiencia</textarea>
+                    <label for="setup-duration">Tiempo maximo de vigencia en minutos</label>
                     <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                   </div>`
                 : appState.surveyType === DIGITAL_PROFILE_TYPE
@@ -1176,7 +1287,7 @@ function hostMenuView() {
     <main class="admin-layout">
       ${roomHeader({ code: "Host" })}
       <section class="host-menu">
-        ${hostActionCard("create", "Crear encuesta", "Configura escala, quiz, nube o perfil digital para compartir en vivo.", "chart")}
+        ${hostActionCard("create", "Crear encuesta", "Configura escala, quiz, nube, texto libre o perfil digital para compartir en vivo.", "chart")}
         ${hostActionCard("history", "Historial", "Consulta resultados, QR, enlaces, Excel y elimina encuestas.", "archive")}
       </section>
       ${footer()}
@@ -1192,6 +1303,7 @@ function surveyTypeChoiceView() {
         ${hostActionCard("scale", "Escala", "Votacion numerica del 1 al 10 con promedio y distribucion.", "scale")}
         ${hostActionCard("quiz", "Quiz", "Preguntas con respuestas correctas, puntos y puntaje final.", "quiz")}
         ${hostActionCard("wordcloud", "Nube de palabras", "Respuestas abiertas que forman una figura según frecuencia.", "wordcloud")}
+        ${hostActionCard(FREE_TEXT_TYPE, "Texto libre", "Preguntas abiertas con resumen y analisis de respuestas.", "text")}
         ${hostActionCard(DIGITAL_PROFILE_TYPE, "Perfil digital", "Clasifica canales tradicionales, hibridos, digitales y muy digitales.", "digitalprofile")}
       </section>
       ${footer()}
@@ -1223,6 +1335,9 @@ function hostCardSvg(icon) {
   }
   if (icon === "wordcloud") {
     return `<svg viewBox="0 0 120 120"><path d="M38 78h50a18 18 0 0 0 2-36 25 25 0 0 0-48-8 22 22 0 0 0-4 44Z"/><path d="M39 56h42M49 68h28M54 44h18"/></svg>`;
+  }
+  if (icon === "text") {
+    return `<svg viewBox="0 0 120 120"><rect x="24" y="24" width="72" height="72" rx="12"/><path d="M40 45h40M40 60h33M40 75h24"/><path d="M76 76l8 8 14-22"/></svg>`;
   }
   if (icon === "digitalprofile") {
     return `<svg viewBox="0 0 120 120"><rect x="24" y="24" width="72" height="72" rx="16"/><path d="M42 76h36M42 60h20M60 44h18"/><circle cx="42" cy="44" r="5"/><path d="M80 72l10 10 18-24"/></svg>`;
@@ -1356,7 +1471,7 @@ function adminSessionRow(session) {
   const links = sessionLinks(session.code);
   const typeLabel = surveyTypeLabel(session.type);
   const annualFormatter = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
-  const metricValue = session.type === "wordcloud"
+  const metricValue = session.type === "wordcloud" || session.type === FREE_TEXT_TYPE
     ? `${stats.count} respuestas`
     : session.type === DIGITAL_PROFILE_TYPE
       ? (stats.count ? annualFormatter.format(stats.average) : "--")
@@ -1427,6 +1542,7 @@ function avatarOption(id, label, icon, color, checked) {
 
 function waitingView(session) {
   if (session.type === "wordcloud") return wordCloudParticipantView(session);
+  if (session.type === FREE_TEXT_TYPE) return freeTextParticipantView(session);
   if (session.type === "quiz") return quizParticipantView(session);
   if (session.type === DIGITAL_PROFILE_TYPE) return digitalProfileParticipantView(session);
   const stats = computeStats(session);
@@ -1479,6 +1595,33 @@ function wordCloudParticipantView(session) {
           : `<form class="panel wordcloud-form" data-action="wordCloudSubmitForm">
               <label for="wordcloud-answer">Tu palabra o frase corta</label>
               <input id="wordcloud-answer" name="wordcloudAnswer" maxlength="80" placeholder="Ej: social media" value="${escapeHtml(draft)}" ${closed ? "disabled" : ""} />
+              <button class="primary full" type="submit" ${closed ? "disabled" : ""}>Enviar respuesta</button>
+            </form>`
+      }
+      ${footer()}
+    </main>
+  `;
+}
+
+function freeTextParticipantView(session) {
+  const voted = Boolean(session.votes[appState.user?.id]);
+  const closed = isSessionClosed(session);
+  const vote = session.votes[appState.user?.id];
+  const draft = appState.freeTextDraft?.[session.code] || "";
+  return `
+    <main class="app-grid">
+      ${roomHeader(session)}
+      <section class="panel question-panel">
+        <p class="eyebrow">Texto libre Â· ${closed ? "Cerrada" : `Tiempo restante ${formatRemaining(session)}`}</p>
+        <h1>${escapeHtml(session.question)}</h1>
+        <p>${Object.keys(session.votes || {}).length} respuestas recibidas</p>
+      </section>
+      ${
+        voted
+          ? `<section class="panel compact"><strong>Tu respuesta quedÃ³ registrada</strong><p>${escapeHtml(vote.answers?.text || "")}</p></section>`
+          : `<form class="panel free-text-form" data-action="freeTextSubmitForm">
+              <label for="free-text-answer">Tu respuesta</label>
+              <textarea id="free-text-answer" name="freeTextAnswer" rows="7" maxlength="1200" placeholder="Escribe aqui tu respuesta" ${closed ? "disabled" : ""}>${escapeHtml(draft)}</textarea>
               <button class="primary full" type="submit" ${closed ? "disabled" : ""}>Enviar respuesta</button>
             </form>`
       }
@@ -1722,12 +1865,44 @@ function resultsSidePanel(session) {
       </div>
     `;
   }
+  if (session.type === FREE_TEXT_TYPE) return freeTextResultsPanel(stats);
   if (session.type === DIGITAL_PROFILE_TYPE) return digitalProfileResultsPanel(session, stats);
   return `
     <div class="panel results-side">
       <h2>Distribución respuestas</h2>
       ${histogram(stats)}
       ${trendPanel(session)}
+    </div>
+  `;
+}
+
+function freeTextResultsPanel(stats) {
+  return `
+    <div class="panel results-side free-text-results-side">
+      <h2>AnÃ¡lisis de textos</h2>
+      <h2 class="free-text-title">Analisis de textos</h2>
+      <div class="free-text-analysis">
+        <strong>Resumen</strong>
+        <p>${escapeHtml(stats.summary)}</p>
+      </div>
+      <div class="free-text-keywords">
+        <strong>Temas principales</strong>
+        <div>
+          ${
+            stats.keywords?.length
+              ? stats.keywords.map((word) => `<span>${escapeHtml(word.text)} <b>${word.count}</b></span>`).join("")
+              : `<small class="muted">Esperando respuestas</small>`
+          }
+        </div>
+      </div>
+      <div class="free-text-quotes">
+        <strong>Respuestas representativas</strong>
+        ${
+          stats.representative?.length
+            ? stats.representative.map((text) => `<blockquote>${escapeHtml(shortText(text, 220))}</blockquote>`).join("")
+            : `<p class="muted">Aun no hay textos para analizar.</p>`
+        }
+      </div>
     </div>
   `;
 }
@@ -1986,14 +2161,14 @@ function liveResultsPanel(session) {
             </a>
           `}
         </div>
-        <div class="metric-card average-card ${session.type === "wordcloud" ? "wordcloud-average-card" : ""} ${isDigitalProfile ? "digital-average-card" : ""}">
+        <div class="metric-card average-card ${session.type === "wordcloud" || session.type === FREE_TEXT_TYPE ? "wordcloud-average-card" : ""} ${isDigitalProfile ? "digital-average-card" : ""}">
           <div>
-            <p class="eyebrow">${session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" ? "Respuestas" : isDigitalProfile ? "Valor promedio" : "Promedio en vivo"}</p>
-            <h1>${session.type === "wordcloud" ? stats.count : isDigitalProfile ? (stats.count ? formatCop(stats.average) : "--") : stats.count ? stats.average.toFixed(1) : "--"}</h1>
+            <p class="eyebrow">${session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" || session.type === FREE_TEXT_TYPE ? "Respuestas" : isDigitalProfile ? "Valor promedio" : "Promedio en vivo"}</p>
+            <h1>${session.type === "wordcloud" || session.type === FREE_TEXT_TYPE ? stats.count : isDigitalProfile ? (stats.count ? formatCop(stats.average) : "--") : stats.count ? stats.average.toFixed(1) : "--"}</h1>
             <p>${stats.count} respuestas de ${Object.keys(session.participants).length} participantes</p>
           </div>
           ${isDigitalProfile ? `<div class="digital-average-analysis"><strong>Analisis</strong><p>${escapeHtml(digitalProfileAverageAnalysis(stats))}</p></div>` : ""}
-          ${session.type === "quiz" || session.type === "wordcloud" || isDigitalProfile ? "" : thermometer(stats.average, true)}
+          ${session.type === "quiz" || session.type === "wordcloud" || session.type === FREE_TEXT_TYPE || isDigitalProfile ? "" : thermometer(stats.average, true)}
         </div>
       </div>
       <div class="live-voters ${isDigitalProfile ? "digital-live-voters" : ""}" aria-live="polite">
@@ -2223,13 +2398,22 @@ function render() {
 
 function shouldPauseRenderForWordCloudInput() {
   const input = document.activeElement;
-  if (input?.id !== "wordcloud-answer") return false;
-  appState.wordCloudDraft = {
-    ...(appState.wordCloudDraft || {}),
-    [appState.code]: input.value
-  };
   const session = getSession(appState.code);
-  return appState.view === "waiting" && session?.type === "wordcloud" && !session.votes?.[appState.user?.id];
+  if (input?.id === "wordcloud-answer") {
+    appState.wordCloudDraft = {
+      ...(appState.wordCloudDraft || {}),
+      [appState.code]: input.value
+    };
+    return appState.view === "waiting" && session?.type === "wordcloud" && !session.votes?.[appState.user?.id];
+  }
+  if (input?.id === "free-text-answer") {
+    appState.freeTextDraft = {
+      ...(appState.freeTextDraft || {}),
+      [appState.code]: input.value
+    };
+    return appState.view === "waiting" && session?.type === FREE_TEXT_TYPE && !session.votes?.[appState.user?.id];
+  }
+  return false;
 }
 
 document.addEventListener("click", async (event) => {
@@ -2254,7 +2438,7 @@ document.addEventListener("click", async (event) => {
     appState.hostSection = "history";
     render();
   }
-  if (["scale", "quiz", "wordcloud", DIGITAL_PROFILE_TYPE].includes(hostCard)) {
+  if (["scale", "quiz", "wordcloud", FREE_TEXT_TYPE, DIGITAL_PROFILE_TYPE].includes(hostCard)) {
     appState.surveyType = hostCard;
     appState.hostSection = "create";
     render();
@@ -2271,7 +2455,7 @@ document.addEventListener("click", async (event) => {
     render();
   }
   if (action === "home") {
-    appState = { ...appState, view: "welcome", code: "", hostMode: false, hostSection: "menu", digitalProfileDraft: {}, wordCloudDraft: {} };
+    appState = { ...appState, view: "welcome", code: "", hostMode: false, hostSection: "menu", digitalProfileDraft: {}, wordCloudDraft: {}, freeTextDraft: {} };
     history.replaceState(null, "", appBaseUrl());
     render();
   }
@@ -2334,6 +2518,7 @@ document.addEventListener("submit", async (event) => {
   }
   if (action === "quizSubmitForm") await submitQuiz(event);
   if (action === "wordCloudSubmitForm") await submitWordCloud(event);
+  if (action === "freeTextSubmitForm") await submitFreeText(event);
   if (action === "digitalProfileSubmitForm") await submitDigitalProfile(event);
 });
 
@@ -2362,6 +2547,12 @@ document.addEventListener("input", (event) => {
       [appState.code]: event.target.value
     };
   }
+  if (event.target.id === "free-text-answer") {
+    appState.freeTextDraft = {
+      ...(appState.freeTextDraft || {}),
+      [appState.code]: event.target.value
+    };
+  }
 });
 
 function clearWordCloudDraft(code) {
@@ -2369,6 +2560,13 @@ function clearWordCloudDraft(code) {
   if (!normalized || !appState.wordCloudDraft?.[normalized]) return;
   const { [normalized]: _cleared, ...rest } = appState.wordCloudDraft;
   appState.wordCloudDraft = rest;
+}
+
+function clearFreeTextDraft(code) {
+  const normalized = String(code || "").toUpperCase();
+  if (!normalized || !appState.freeTextDraft?.[normalized]) return;
+  const { [normalized]: _cleared, ...rest } = appState.freeTextDraft;
+  appState.freeTextDraft = rest;
 }
 
 window.addEventListener("retox:update", render);
@@ -2393,13 +2591,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v52")) return;
-    sessionStorage.setItem("retox.swReloaded.v52", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v54")) return;
+    sessionStorage.setItem("retox.swReloaded.v54", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=52", { updateViaCache: "none" })
+    .register("./sw.js?v=54", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })

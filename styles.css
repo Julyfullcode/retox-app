@@ -688,9 +688,69 @@ fieldset {
 .digital-profile-builder,
 .digital-profile-options,
 .quiz-answer-form,
-.wordcloud-form {
+.wordcloud-form,
+.free-text-form {
   display: grid;
   gap: 10px;
+}
+
+.free-text-form textarea {
+  min-height: 180px;
+  resize: vertical;
+}
+
+.free-text-results-side {
+  gap: 16px;
+}
+
+.free-text-results-side > h2:first-child {
+  display: none;
+}
+
+.free-text-title {
+  display: block;
+}
+
+.free-text-analysis,
+.free-text-keywords,
+.free-text-quotes {
+  display: grid;
+  gap: 8px;
+}
+
+.free-text-analysis p,
+.free-text-quotes blockquote {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.free-text-quotes blockquote {
+  border-left: 4px solid var(--green);
+  padding-left: 12px;
+}
+
+.free-text-keywords div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.free-text-keywords span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--green) 10%, var(--card));
+  color: var(--ink);
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.free-text-keywords b {
+  color: var(--blue);
 }
 
 .wordcloud-side {
