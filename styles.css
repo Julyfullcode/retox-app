@@ -701,27 +701,27 @@ fieldset {
 .word-cloud-shape {
   position: relative;
   width: 100%;
-  max-width: 390px;
-  aspect-ratio: 1.14;
+  max-width: 690px;
+  aspect-ratio: 1.82;
   min-height: 380px;
   margin-inline: auto;
   overflow: hidden;
-  border-radius: 36% 48% 42% 52% / 42% 38% 54% 48%;
+  border-radius: 38% 48% 42% 52% / 42% 38% 54% 48%;
   background:
     radial-gradient(circle at 50% 50%, rgba(31, 111, 178, 0.08), transparent 62%),
     color-mix(in srgb, var(--card) 96%, transparent);
-  clip-path: polygon(15% 39%, 22% 26%, 35% 21%, 46% 10%, 61% 12%, 71% 23%, 84% 27%, 93% 41%, 88% 57%, 75% 66%, 70% 81%, 53% 84%, 43% 74%, 28% 77%, 16% 67%, 7% 54%);
+  clip-path: polygon(9% 45%, 16% 31%, 29% 23%, 42% 12%, 58% 12%, 70% 22%, 84% 27%, 95% 43%, 91% 59%, 78% 69%, 67% 83%, 50% 87%, 39% 78%, 24% 80%, 11% 68%, 4% 55%);
 }
 
 .word-cloud-shape span {
   position: absolute;
   left: var(--x);
   top: var(--y);
-  max-width: min(72%, 280px);
+  max-width: min(78%, 440px);
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--c);
-  font-size: clamp(0.72rem, var(--s), 3.5rem);
+  font-size: clamp(0.72rem, var(--s), 3.65rem);
   font-weight: 900;
   line-height: 0.9;
   white-space: nowrap;
@@ -1206,6 +1206,10 @@ fieldset {
   grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
   gap: 16px;
   align-items: stretch;
+}
+
+.wordcloud-results-row {
+  grid-template-columns: minmax(260px, 0.62fr) minmax(520px, 1.38fr);
 }
 
 .host-main,
@@ -1774,6 +1778,12 @@ footer {
     grid-template-columns: repeat(5, 1fr);
   }
 
+}
+
+@media (max-width: 860px) {
+  .wordcloud-results-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 460px) {

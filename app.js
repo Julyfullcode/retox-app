@@ -912,12 +912,18 @@ function computeQuizStats(session) {
 }
 
 function extractWords(text) {
-  const stopWords = new Set(["de", "del", "la", "las", "el", "los", "y", "o", "a", "en", "un", "una", "por", "para", "con", "que", "es", "son"]);
+  const stopWords = new Set([
+    "a", "al", "algo", "ante", "asi", "como", "con", "contra", "cual", "cuando", "de", "del", "desde", "donde",
+    "e", "el", "ella", "ellas", "ellos", "en", "entre", "era", "eres", "es", "esa", "esas", "ese", "eso", "esos",
+    "esta", "estas", "este", "esto", "estos", "fue", "ha", "hay", "la", "las", "lo", "los", "mas", "me", "mi",
+    "mis", "muy", "ni", "no", "nos", "o", "otra", "otro", "para", "pero", "por", "porque", "que", "se", "ser",
+    "si", "sin", "son", "su", "sus", "te", "tiene", "tu", "tus", "un", "una", "unas", "uno", "unos", "y", "ya"
+  ]);
   return String(text || "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9ñ\s]/g, " ")
+    .replace(/[^a-z0-9\u00f1\s]/g, " ")
     .split(/\s+/)
     .map((word) => word.trim())
     .filter((word) => word.length > 2 && !stopWords.has(word))
@@ -1646,7 +1652,7 @@ function hostView(session) {
     <main class="host-layout">
       ${roomHeader(session)}
       <section class="host-main">
-        <div class="results-row">
+        <div class="results-row ${session.type === "wordcloud" ? "wordcloud-results-row" : ""}">
           ${liveResultsPanel(session)}
           ${resultsSidePanel(session)}
         </div>
@@ -1785,26 +1791,79 @@ function digitalProfileAverageAnalysis(stats) {
 }
 
 function wordCloudVisual(words) {
-  const palette = ["#0b8f48", "#1f6fb2", "#d12aa6", "#111827", "#80bd28", "#f28b2e"];
-  const slots = [
-    [50, 49, 0], [33, 42, -90], [64, 54, 0], [48, 30, 0], [24, 57, -90], [76, 42, -90],
-    [39, 65, 0], [60, 70, 0], [18, 37, -90], [82, 62, -90], [29, 25, 0], [70, 25, 0],
-    [50, 78, 0], [15, 72, -90], [88, 28, -90], [37, 18, 0], [63, 16, 0], [21, 18, -90],
-    [79, 80, -90], [49, 88, 0], [9, 49, -90], [91, 51, -90], [28, 78, 0], [71, 83, 0],
-    [14, 28, -90], [86, 73, -90], [42, 7, 0], [58, 93, 0], [7, 65, -90], [94, 37, -90],
-    [32, 91, 0], [68, 7, 0], [50, 12, 0], [50, 62, 0]
-  ];
+  const palette = ["#0b8f48", "#1f6fb2", "#b01818", "#7a2e0b", "#80bd28", "#f28b2e", "#111827"];
   if (!words.length) return `<div class="word-cloud-shape empty">Esperando respuestas</div>`;
-  const max = Math.max(...words.map((word) => word.count), 1);
+  const layout = wordCloudLayout(words);
   return `
     <div class="word-cloud-shape">
-      ${words.map((word, index) => {
-        const [x, y, rotate] = slots[index % slots.length];
-        const size = 0.78 + (word.count / max) * 2.4;
-        return `<span style="--x:${x}%;--y:${y}%;--r:${rotate}deg;--s:${size}rem;--c:${palette[index % palette.length]}">${escapeHtml(word.text)}</span>`;
-      }).join("")}
+      ${layout.map((word, index) => `<span style="--x:${word.x}%;--y:${word.y}%;--r:${word.rotate}deg;--s:${word.size}rem;--c:${palette[index % palette.length]}">${escapeHtml(word.text)}</span>`).join("")}
     </div>
   `;
+}
+
+function wordCloudLayout(words) {
+  const max = Math.max(...words.map((word) => word.count), 1);
+  const min = Math.min(...words.map((word) => word.count), max);
+  const area = { width: 1000, height: 540 };
+  const placed = [];
+  const candidates = words.slice(0, 44).map((word) => {
+    const weight = max === min ? (max > 1 ? 0.55 : 0.18) : (word.count - min) / (max - min);
+    return {
+      ...word,
+      size: Number((0.86 + Math.sqrt(weight) * 2.55).toFixed(2))
+    };
+  });
+
+  candidates.forEach((word, index) => {
+    const rotate = index > 0 && index % 5 === 0 ? -90 : 0;
+    const fontPx = word.size * 16;
+    const box = wordBox(word.text, fontPx, rotate);
+    let selected = null;
+
+    for (let step = 0; step < 1500 && !selected; step += 1) {
+      const angle = step * 0.42 + index * 0.9;
+      const radius = 5 + step * 0.34;
+      const x = area.width / 2 + Math.cos(angle) * radius * 1.38;
+      const y = area.height / 2 + Math.sin(angle) * radius * 0.82;
+      const rect = {
+        left: x - box.width / 2,
+        right: x + box.width / 2,
+        top: y - box.height / 2,
+        bottom: y + box.height / 2
+      };
+      if (!insideCloud(rect, area) || placed.some((item) => overlaps(rect, item.rect))) continue;
+      selected = { x, y, rect };
+    }
+
+    if (!selected) return;
+    placed.push({
+      ...word,
+      rotate,
+      x: Number(((selected.x / area.width) * 100).toFixed(2)),
+      y: Number(((selected.y / area.height) * 100).toFixed(2)),
+      rect: selected.rect
+    });
+  });
+
+  return placed;
+}
+
+function wordBox(text, fontPx, rotate) {
+  const letters = String(text || "").length;
+  const baseWidth = Math.max(fontPx * 1.25, letters * fontPx * 0.58);
+  const baseHeight = fontPx * 1.08;
+  return rotate ? { width: baseHeight, height: baseWidth } : { width: baseWidth, height: baseHeight };
+}
+
+function insideCloud(rect, area) {
+  const paddingX = area.width * 0.04;
+  const paddingY = area.height * 0.08;
+  return rect.left >= paddingX && rect.right <= area.width - paddingX && rect.top >= paddingY && rect.bottom <= area.height - paddingY;
+}
+
+function overlaps(a, b) {
+  const gap = 6;
+  return !(a.right + gap < b.left || a.left - gap > b.right || a.bottom + gap < b.top || a.top - gap > b.bottom);
 }
 
 function trendPanel(session) {
@@ -1865,7 +1924,7 @@ function displayView(session) {
     <main class="display-layout">
       ${roomHeader(session)}
       <section class="display-results">
-        <div class="results-row">
+        <div class="results-row ${session.type === "wordcloud" ? "wordcloud-results-row" : ""}">
           ${liveResultsPanel(session)}
           ${resultsSidePanel(session)}
         </div>
