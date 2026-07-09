@@ -1794,12 +1794,12 @@ function digitalProfileAverageAnalysis(stats) {
 }
 
 function wordCloudVisual(words) {
-  const palette = ["#0b8f48", "#1f6fb2", "#b01818", "#7a2e0b", "#80bd28", "#f28b2e", "#111827"];
+  const palette = ["#0b8f48", "#80bd28", "#1f6fb2", "#0067b1", "#6d6e71", "#15251f"];
   if (!words.length) return `<div class="word-cloud-shape empty">Esperando respuestas</div>`;
   const layout = wordCloudLayout(words);
   return `
     <div class="word-cloud-shape">
-      ${layout.map((word, index) => `<span style="--x:${word.x}%;--y:${word.y}%;--r:${word.rotate}deg;--s:${word.size}rem;--c:${palette[index % palette.length]}">${escapeHtml(word.text)}</span>`).join("")}
+      ${layout.map((word, index) => `<span style="--x:${word.x}%;--y:${word.y}%;--r:${word.rotate}deg;--s:${word.size};--c:${palette[index % palette.length]}">${escapeHtml(word.text)}</span>`).join("")}
     </div>
   `;
 }
@@ -1807,41 +1807,48 @@ function wordCloudVisual(words) {
 function wordCloudLayout(words) {
   const max = Math.max(...words.map((word) => word.count), 1);
   const min = Math.min(...words.map((word) => word.count), max);
-  const area = { width: 1000, height: 540 };
+  const area = { width: 100, height: 55 };
   const placed = [];
   const candidates = words.slice(0, 44).map((word) => {
     const weight = max === min ? (max > 1 ? 0.55 : 0.18) : (word.count - min) / (max - min);
     return {
       ...word,
-      size: Number((0.86 + Math.sqrt(weight) * 2.55).toFixed(2))
+      size: Number((1.75 + Math.sqrt(weight) * 5.15).toFixed(2))
     };
   });
 
   candidates.forEach((word, index) => {
-    const rotate = index > 0 && index % 5 === 0 ? -90 : 0;
-    const fontPx = word.size * 16;
-    const box = wordBox(word.text, fontPx, rotate);
     let selected = null;
+    const rotations = index > 0 && index % 5 === 0 ? [-90, 0] : [0, -90];
 
-    for (let step = 0; step < 1500 && !selected; step += 1) {
-      const angle = step * 0.42 + index * 0.9;
-      const radius = 5 + step * 0.34;
-      const x = area.width / 2 + Math.cos(angle) * radius * 1.38;
-      const y = area.height / 2 + Math.sin(angle) * radius * 0.82;
-      const rect = {
-        left: x - box.width / 2,
-        right: x + box.width / 2,
-        top: y - box.height / 2,
-        bottom: y + box.height / 2
-      };
-      if (!insideCloud(rect, area) || placed.some((item) => overlaps(rect, item.rect))) continue;
-      selected = { x, y, rect };
+    for (const shrink of [1, 0.88, 0.76, 0.64]) {
+      const size = Number((word.size * shrink).toFixed(2));
+      for (const rotate of rotations) {
+        const box = wordBox(word.text, size, rotate);
+        for (let step = 0; step < 2200 && !selected; step += 1) {
+          const angle = step * 0.47 + index * 1.13;
+          const radius = step * 0.052;
+          const x = area.width / 2 + Math.cos(angle) * radius * 1.58;
+          const y = area.height / 2 + Math.sin(angle) * radius * 0.9;
+          const rect = {
+            left: x - box.width / 2,
+            right: x + box.width / 2,
+            top: y - box.height / 2,
+            bottom: y + box.height / 2
+          };
+          if (!insideCloud(rect, area) || placed.some((item) => overlaps(rect, item.rect))) continue;
+          selected = { x, y, rect, rotate, size };
+        }
+        if (selected) break;
+      }
+      if (selected) break;
     }
 
     if (!selected) return;
     placed.push({
       ...word,
-      rotate,
+      rotate: selected.rotate,
+      size: selected.size,
       x: Number(((selected.x / area.width) * 100).toFixed(2)),
       y: Number(((selected.y / area.height) * 100).toFixed(2)),
       rect: selected.rect
@@ -1851,21 +1858,21 @@ function wordCloudLayout(words) {
   return placed;
 }
 
-function wordBox(text, fontPx, rotate) {
+function wordBox(text, fontSize, rotate) {
   const letters = String(text || "").length;
-  const baseWidth = Math.max(fontPx * 1.25, letters * fontPx * 0.58);
-  const baseHeight = fontPx * 1.08;
+  const baseWidth = Math.max(fontSize * 1.55, letters * fontSize * 0.72);
+  const baseHeight = fontSize * 1.28;
   return rotate ? { width: baseHeight, height: baseWidth } : { width: baseWidth, height: baseHeight };
 }
 
 function insideCloud(rect, area) {
-  const paddingX = area.width * 0.04;
-  const paddingY = area.height * 0.08;
+  const paddingX = area.width * 0.05;
+  const paddingY = area.height * 0.1;
   return rect.left >= paddingX && rect.right <= area.width - paddingX && rect.top >= paddingY && rect.bottom <= area.height - paddingY;
 }
 
 function overlaps(a, b) {
-  const gap = 6;
+  const gap = 1.35;
   return !(a.right + gap < b.left || a.left - gap > b.right || a.bottom + gap < b.top || a.top - gap > b.bottom);
 }
 
@@ -2386,13 +2393,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v50")) return;
-    sessionStorage.setItem("retox.swReloaded.v50", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v52")) return;
+    sessionStorage.setItem("retox.swReloaded.v52", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=50", { updateViaCache: "none" })
+    .register("./sw.js?v=52", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })

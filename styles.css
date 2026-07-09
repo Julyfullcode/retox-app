@@ -700,6 +700,7 @@ fieldset {
 
 .word-cloud-shape {
   position: relative;
+  container-type: inline-size;
   width: 100%;
   max-width: 690px;
   aspect-ratio: 1.82;
@@ -721,7 +722,7 @@ fieldset {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--c);
-  font-size: clamp(0.72rem, var(--s), 3.65rem);
+  font-size: min(calc(var(--s) * 1cqw), 3.45rem);
   font-weight: 900;
   line-height: 0.9;
   white-space: nowrap;
