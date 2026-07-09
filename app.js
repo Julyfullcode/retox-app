@@ -83,7 +83,8 @@ let appState = {
   dark: false,
   hostSection: "menu",
   surveyType: "scale",
-  digitalProfileDraft: {}
+  digitalProfileDraft: {},
+  wordCloudDraft: {}
 };
 
 function uid() {
@@ -635,6 +636,7 @@ async function submitWordCloud(event) {
     return;
   }
   const saved = await saveWordCloudVote(appState.code, appState.user, text, current.round);
+  if (saved) clearWordCloudDraft(appState.code);
   toast(saved ? "Respuesta enviada." : "Tu respuesta ya fue enviada.");
   render();
 }
@@ -1021,7 +1023,7 @@ function personChip(person, extra = "", action = "", detail = "") {
   const tag = action ? "button" : "div";
   const actionAttrs = action ? ` type="button" data-action="${action}" aria-label="Cambiar nombre o avatar"` : "";
   return `
-    <${tag} class="person-chip ${extra}" style="--avatar-bg:${color}" title="${escapeHtml(label)}"${actionAttrs}>
+    <${tag} class="person-chip ${extra}" style="--avatar-bg:${color}" title="${escapeHtml(person.name)} · ${escapeHtml(label)}"${actionAttrs}>
       <span class="person-avatar" aria-hidden="true">${icon}</span>
       <span class="person-text">
         <span class="person-name">${escapeHtml(person.name)}</span>
@@ -1462,6 +1464,7 @@ function wordCloudParticipantView(session) {
   const voted = Boolean(session.votes[appState.user?.id]);
   const closed = isSessionClosed(session);
   const vote = session.votes[appState.user?.id];
+  const draft = appState.wordCloudDraft?.[session.code] || "";
   return `
     <main class="app-grid">
       ${roomHeader(session)}
@@ -1475,7 +1478,7 @@ function wordCloudParticipantView(session) {
           ? `<section class="panel compact"><strong>Tu respuesta quedó registrada</strong><p>${escapeHtml(vote.answers?.text || "")}</p></section>`
           : `<form class="panel wordcloud-form" data-action="wordCloudSubmitForm">
               <label for="wordcloud-answer">Tu palabra o frase corta</label>
-              <input id="wordcloud-answer" name="wordcloudAnswer" maxlength="80" placeholder="Ej: social media" ${closed ? "disabled" : ""} />
+              <input id="wordcloud-answer" name="wordcloudAnswer" maxlength="80" placeholder="Ej: social media" value="${escapeHtml(draft)}" ${closed ? "disabled" : ""} />
               <button class="primary full" type="submit" ${closed ? "disabled" : ""}>Enviar respuesta</button>
             </form>`
       }
@@ -1963,9 +1966,9 @@ function liveResultsPanel(session) {
   const people = isDigitalProfile ? votedPeople(session) : votedPeople(session).slice(-5);
   const links = sessionLinks(session.code);
   return `
-    <div class="results-stage">
+    <div class="results-stage ${session.type === "wordcloud" ? "wordcloud-stage" : ""}">
       <h2 class="live-question">${escapeHtml(session.question)}</h2>
-      <div class="live-metrics">
+      <div class="live-metrics ${session.type === "wordcloud" ? "wordcloud-metrics" : ""}">
         <div class="metric-card countdown ${isSessionClosed(session) ? "closed" : ""}">
           <span>${isSessionClosed(session) ? "Votacion cerrada" : "Tiempo restante"}</span>
           <strong>${formatRemaining(session)}</strong>
@@ -1976,7 +1979,7 @@ function liveResultsPanel(session) {
             </a>
           `}
         </div>
-        <div class="metric-card average-card ${isDigitalProfile ? "digital-average-card" : ""}">
+        <div class="metric-card average-card ${session.type === "wordcloud" ? "wordcloud-average-card" : ""} ${isDigitalProfile ? "digital-average-card" : ""}">
           <div>
             <p class="eyebrow">${session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" ? "Respuestas" : isDigitalProfile ? "Valor promedio" : "Promedio en vivo"}</p>
             <h1>${session.type === "wordcloud" ? stats.count : isDigitalProfile ? (stats.count ? formatCop(stats.average) : "--") : stats.count ? stats.average.toFixed(1) : "--"}</h1>
@@ -2139,6 +2142,7 @@ function playDigitalProfileSound(profileKey) {
 
 function render() {
   const root = document.querySelector("#app");
+  if (shouldPauseRenderForWordCloudInput()) return;
   const digitalResultsScroll = document.querySelector(".digital-results-side")?.scrollTop || 0;
   document.body.classList.toggle("dark", appState.dark);
   const hashJoin = location.hash.match(/join=([A-Z0-9]{4})/i);
@@ -2210,6 +2214,17 @@ function render() {
   if (digitalResultsSide) digitalResultsSide.scrollTop = digitalResultsScroll;
 }
 
+function shouldPauseRenderForWordCloudInput() {
+  const input = document.activeElement;
+  if (input?.id !== "wordcloud-answer") return false;
+  appState.wordCloudDraft = {
+    ...(appState.wordCloudDraft || {}),
+    [appState.code]: input.value
+  };
+  const session = getSession(appState.code);
+  return appState.view === "waiting" && session?.type === "wordcloud" && !session.votes?.[appState.user?.id];
+}
+
 document.addEventListener("click", async (event) => {
   const action = event.target.closest("[data-action]")?.dataset.action;
   const voteValue = event.target.closest("[data-vote]")?.dataset.vote;
@@ -2249,7 +2264,7 @@ document.addEventListener("click", async (event) => {
     render();
   }
   if (action === "home") {
-    appState = { ...appState, view: "welcome", code: "", hostMode: false, hostSection: "menu", digitalProfileDraft: {} };
+    appState = { ...appState, view: "welcome", code: "", hostMode: false, hostSection: "menu", digitalProfileDraft: {}, wordCloudDraft: {} };
     history.replaceState(null, "", appBaseUrl());
     render();
   }
@@ -2333,6 +2348,22 @@ document.addEventListener("change", (event) => {
   }
 });
 
+document.addEventListener("input", (event) => {
+  if (event.target.id === "wordcloud-answer") {
+    appState.wordCloudDraft = {
+      ...(appState.wordCloudDraft || {}),
+      [appState.code]: event.target.value
+    };
+  }
+});
+
+function clearWordCloudDraft(code) {
+  const normalized = String(code || "").toUpperCase();
+  if (!normalized || !appState.wordCloudDraft?.[normalized]) return;
+  const { [normalized]: _cleared, ...rest } = appState.wordCloudDraft;
+  appState.wordCloudDraft = rest;
+}
+
 window.addEventListener("retox:update", render);
 broadcast?.addEventListener("message", () => {
   sessionCache = readLocalSessions();
@@ -2355,13 +2386,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v47")) return;
-    sessionStorage.setItem("retox.swReloaded.v47", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v50")) return;
+    sessionStorage.setItem("retox.swReloaded.v50", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=47", { updateViaCache: "none" })
+    .register("./sw.js?v=50", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })

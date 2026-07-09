@@ -1209,7 +1209,7 @@ fieldset {
 }
 
 .wordcloud-results-row {
-  grid-template-columns: minmax(260px, 0.62fr) minmax(520px, 1.38fr);
+  grid-template-columns: minmax(320px, 0.72fr) minmax(520px, 1.28fr);
 }
 
 .host-main,
@@ -1248,6 +1248,10 @@ fieldset {
   grid-template-columns: minmax(170px, 0.45fr) minmax(0, 1fr);
   gap: 10px;
   width: 100%;
+}
+
+.wordcloud-metrics {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .metric-card {
@@ -1312,6 +1316,10 @@ fieldset {
   align-items: start;
 }
 
+.wordcloud-average-card {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .average-card > div {
   display: grid;
   justify-items: center;
@@ -1330,11 +1338,26 @@ fieldset {
   font-size: clamp(1rem, 1.8vw, 1.28rem);
   font-weight: 900;
   text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .results-stage h1 {
   margin-top: 2px;
   font-size: clamp(3.2rem, 9vw, 5.8rem);
+}
+
+.wordcloud-stage .live-question {
+  font-size: clamp(1.55rem, 2.1vw, 2.5rem);
+}
+
+.wordcloud-stage .countdown strong,
+.wordcloud-stage h1 {
+  font-size: clamp(2.2rem, 5.8vw, 4.7rem);
+}
+
+.wordcloud-stage p {
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .results-stage .digital-average-card h1 {
@@ -1356,14 +1379,27 @@ fieldset {
   justify-content: center;
   gap: 8px;
   width: 100%;
-  min-height: 46px;
-  max-height: 46px;
+  min-height: 48px;
+  max-height: 48px;
   overflow: hidden;
   padding-top: 4px;
 }
 
 .live-voters .person-chip {
-  max-width: 140px;
+  max-width: 178px;
+  gap: 6px;
+  padding: 5px 9px 5px 5px;
+}
+
+.live-voters .person-avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 1.05rem;
+}
+
+.live-voters .person-name {
+  font-size: clamp(0.64rem, 1.15vw, 0.78rem);
+  line-height: 1;
 }
 
 .digital-live-voters {
