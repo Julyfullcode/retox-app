@@ -2355,13 +2355,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v46")) return;
-    sessionStorage.setItem("retox.swReloaded.v46", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v47")) return;
+    sessionStorage.setItem("retox.swReloaded.v47", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=46", { updateViaCache: "none" })
+    .register("./sw.js?v=47", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })
