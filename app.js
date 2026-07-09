@@ -857,11 +857,14 @@ function exportSessionResults(session) {
         ["Respuestas", stats.count],
         ["Promedio palabras", stats.averageLength || 0],
         [],
-        ["Tema", "Cantidad"],
-        ...(stats.keywords || []).map((word) => [word.text, word.count]),
+        ["Analisis"],
+        ...(stats.analysis || []).map((item) => [item]),
         [],
-        ["Respuestas representativas"],
-        ...(stats.representative || []).map((text) => [text])
+        ["Tema representativo", "Menciones", "Detalle"],
+        ...(stats.themes || []).map((theme) => [theme.label, theme.count, theme.detail]),
+        [],
+        ["Acciones sugeridas"],
+        ...(stats.recommendations || []).map((item) => [item])
       ]
     }] : session.type === DIGITAL_PROFILE_TYPE ? [{
       name: "Perfil digital",
@@ -1011,15 +1014,10 @@ function computeFreeTextStats(session) {
   responses.forEach((text) => {
     extractWords(text, 120).forEach((word) => counts.set(word, (counts.get(word) || 0) + 1));
   });
-  const keywords = [...counts.entries()]
+  const allKeywords = [...counts.entries()]
     .map(([text, count]) => ({ text, count }))
-    .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text))
-    .slice(0, 12);
-  const representative = responses
-    .map((text) => ({ text, score: extractWords(text, 120).reduce((sum, word) => sum + (counts.get(word) || 0), 0) }))
-    .sort((a, b) => b.score - a.score || b.text.length - a.text.length)
-    .slice(0, 3)
-    .map((item) => item.text);
+    .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text));
+  const themes = freeTextThemes(responses, allKeywords);
   const averageLength = responses.length
     ? Math.round(responses.reduce((sum, text) => sum + text.split(/\s+/).filter(Boolean).length, 0) / responses.length)
     : 0;
@@ -1027,22 +1025,70 @@ function computeFreeTextStats(session) {
     average: responses.length,
     count: responses.length,
     distribution: [],
-    max: Math.max(1, ...keywords.map((word) => word.count)),
+    max: Math.max(1, ...themes.map((theme) => theme.count)),
     responses,
-    keywords,
-    representative,
+    keywords: themes.map((theme) => ({ text: theme.label, count: theme.count })),
+    themes,
     averageLength,
-    summary: freeTextSummary(responses, keywords, representative)
+    summary: freeTextSummary(responses, themes, averageLength),
+    analysis: freeTextAnalysis(responses, themes),
+    recommendations: freeTextRecommendations(themes)
   };
 }
 
-function freeTextSummary(responses, keywords, representative) {
+function freeTextThemes(responses, allKeywords) {
+  const minimumCount = responses.length >= 4 ? 2 : 1;
+  return allKeywords
+    .filter((word) => word.count >= minimumCount)
+    .slice(0, 5)
+    .map((word) => {
+      const relatedCounts = new Map();
+      responses
+        .filter((text) => extractWords(text, 120).includes(word.text))
+        .forEach((text) => {
+          extractWords(text, 120)
+            .filter((related) => related !== word.text)
+            .forEach((related) => relatedCounts.set(related, (relatedCounts.get(related) || 0) + 1));
+        });
+      const related = [...relatedCounts.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 2)
+        .map(([text]) => text);
+      return {
+        label: word.text,
+        count: word.count,
+        detail: related.length
+          ? `Se relaciona con ${related.join(" y ")}.`
+          : "Aparece como idea recurrente en las respuestas."
+      };
+    });
+}
+
+function freeTextSummary(responses, themes, averageLength) {
   if (!responses.length) return "Aun no hay respuestas. Cuando empiecen a llegar, aqui aparecera un resumen automatico de los temas principales.";
-  const top = keywords.slice(0, 5).map((word) => word.text);
-  const themeText = top.length ? top.join(", ") : "sin temas repetidos claros";
-  const sample = representative[0] ? ` Una respuesta representativa menciona: "${shortText(representative[0], 140)}".` : "";
-  if (responses.length === 1) return `Hay una respuesta registrada. El tema principal detectado es ${themeText}.${sample}`;
-  return `En ${responses.length} respuestas, los temas mas repetidos son ${themeText}. La lectura general muestra coincidencias alrededor de esas ideas y permite priorizar mensajes o acciones sobre lo que mas se repite.${sample}`;
+  if (!themes.length) return `Hay ${responses.length} respuestas registradas, pero todavia no hay un patron repetido claro. Conviene leerlas como insumos exploratorios y esperar mas participacion.`;
+  const themeText = themes.slice(0, 3).map((theme) => theme.label).join(", ");
+  return `En ${responses.length} respuestas, la conversacion se concentra principalmente en ${themeText}. Las respuestas tienen en promedio ${averageLength} palabras, suficiente para detectar tendencias sin mostrar cada texto individual.`;
+}
+
+function freeTextAnalysis(responses, themes) {
+  if (!responses.length) return ["El analisis aparecera cuando lleguen las primeras respuestas."];
+  if (!themes.length) return ["Las respuestas son variadas y aun no forman una tendencia dominante.", "Se recomienda esperar mas participacion antes de sacar conclusiones."];
+  return themes.slice(0, 3).map((theme) => `${capitalize(theme.label)} aparece en ${theme.count} menciones. ${theme.detail}`);
+}
+
+function freeTextRecommendations(themes) {
+  if (!themes.length) return ["Recoger mas respuestas para identificar patrones con mayor confianza."];
+  return [
+    `Priorizar acciones alrededor de ${themes[0].label}.`,
+    themes[1] ? `Cruzar ${themes[0].label} con ${themes[1].label} para entender si hacen parte del mismo problema.` : "Profundizar con una pregunta de seguimiento sobre el tema principal.",
+    "Cerrar la conversacion con compromisos concretos y responsables visibles."
+  ];
+}
+
+function capitalize(text) {
+  const value = String(text || "");
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
 }
 
 function shortText(text, maxLength = 120) {
@@ -1882,24 +1928,32 @@ function freeTextResultsPanel(stats) {
       <h2>AnÃ¡lisis de textos</h2>
       <h2 class="free-text-title">Analisis de textos</h2>
       <div class="free-text-analysis">
-        <strong>Resumen</strong>
+        <strong>Resumen ejecutivo</strong>
         <p>${escapeHtml(stats.summary)}</p>
       </div>
+      <div class="free-text-insights">
+        <strong>Analisis</strong>
+        ${
+          stats.analysis?.length
+            ? `<ul>${stats.analysis.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+            : `<p class="muted">Esperando respuestas para analizar.</p>`
+        }
+      </div>
       <div class="free-text-keywords">
-        <strong>Temas principales</strong>
+        <strong>Temas representativos</strong>
         <div>
           ${
-            stats.keywords?.length
-              ? stats.keywords.map((word) => `<span>${escapeHtml(word.text)} <b>${word.count}</b></span>`).join("")
+            stats.themes?.length
+              ? stats.themes.map((theme) => `<span>${escapeHtml(theme.label)} <b>${theme.count}</b></span>`).join("")
               : `<small class="muted">Esperando respuestas</small>`
           }
         </div>
       </div>
-      <div class="free-text-quotes">
-        <strong>Respuestas representativas</strong>
+      <div class="free-text-actions">
+        <strong>Acciones sugeridas</strong>
         ${
-          stats.representative?.length
-            ? stats.representative.map((text) => `<blockquote>${escapeHtml(shortText(text, 220))}</blockquote>`).join("")
+          stats.recommendations?.length
+            ? `<ul>${stats.recommendations.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
             : `<p class="muted">Aun no hay textos para analizar.</p>`
         }
       </div>
@@ -2591,13 +2645,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v54")) return;
-    sessionStorage.setItem("retox.swReloaded.v54", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v55")) return;
+    sessionStorage.setItem("retox.swReloaded.v55", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=54", { updateViaCache: "none" })
+    .register("./sw.js?v=55", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })

@@ -712,22 +712,26 @@ fieldset {
 }
 
 .free-text-analysis,
+.free-text-insights,
 .free-text-keywords,
-.free-text-quotes {
+.free-text-actions {
   display: grid;
   gap: 8px;
 }
 
 .free-text-analysis p,
-.free-text-quotes blockquote {
+.free-text-insights ul,
+.free-text-actions ul {
   margin: 0;
   color: var(--muted);
   line-height: 1.45;
 }
 
-.free-text-quotes blockquote {
-  border-left: 4px solid var(--green);
-  padding-left: 12px;
+.free-text-insights ul,
+.free-text-actions ul {
+  display: grid;
+  gap: 8px;
+  padding-left: 18px;
 }
 
 .free-text-keywords div {
