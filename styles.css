@@ -1277,6 +1277,10 @@ fieldset {
   grid-template-columns: minmax(320px, 0.72fr) minmax(520px, 1.28fr);
 }
 
+.free-text-results-row {
+  grid-template-columns: minmax(250px, 0.46fr) minmax(640px, 1.54fr);
+}
+
 .host-main,
 .host-side {
   display: grid;
@@ -1316,6 +1320,10 @@ fieldset {
 }
 
 .wordcloud-metrics {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.free-text-metrics {
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -1882,7 +1890,8 @@ footer {
 }
 
 @media (max-width: 860px) {
-  .wordcloud-results-row {
+  .wordcloud-results-row,
+  .free-text-results-row {
     grid-template-columns: 1fr;
   }
 }

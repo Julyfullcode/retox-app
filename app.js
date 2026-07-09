@@ -1092,7 +1092,7 @@ function freeTextSummary(responses, themes) {
   if (!responses.length) return "Aun no hay respuestas. Cuando empiecen a llegar, aqui aparecera un resumen automatico de los temas principales.";
   if (!themes.length) return `Hay ${responses.length} respuestas registradas, pero todavia no hay un patron repetido claro. Conviene leerlas como insumos exploratorios y esperar mas participacion.`;
   const themeText = themes.slice(0, 3).map((theme) => theme.label.toLowerCase()).join(", ");
-  return `A partir de ${responses.length} respuestas, la lectura ejecutiva se concentra en ${themeText}. El resultado sintetiza las tendencias principales sin transcribir literalmente los comentarios.`;
+  return `A partir de ${responses.length} respuestas, la lectura ejecutiva se concentra en ${themeText}.`;
 }
 
 function freeTextAnalysis(responses, themes) {
@@ -1868,7 +1868,7 @@ function hostView(session) {
     <main class="host-layout">
       ${roomHeader(session)}
       <section class="host-main">
-        <div class="results-row ${session.type === "wordcloud" ? "wordcloud-results-row" : ""}">
+        <div class="results-row ${session.type === "wordcloud" ? "wordcloud-results-row" : session.type === FREE_TEXT_TYPE ? "free-text-results-row" : ""}">
           ${liveResultsPanel(session)}
           ${resultsSidePanel(session)}
         </div>
@@ -2187,7 +2187,7 @@ function displayView(session) {
     <main class="display-layout">
       ${roomHeader(session)}
       <section class="display-results">
-        <div class="results-row ${session.type === "wordcloud" ? "wordcloud-results-row" : ""}">
+        <div class="results-row ${session.type === "wordcloud" ? "wordcloud-results-row" : session.type === FREE_TEXT_TYPE ? "free-text-results-row" : ""}">
           ${liveResultsPanel(session)}
           ${resultsSidePanel(session)}
         </div>
@@ -2228,7 +2228,7 @@ function liveResultsPanel(session) {
   return `
     <div class="results-stage ${session.type === "wordcloud" ? "wordcloud-stage" : ""}">
       <h2 class="live-question">${escapeHtml(session.question)}</h2>
-      <div class="live-metrics ${session.type === "wordcloud" ? "wordcloud-metrics" : ""}">
+      <div class="live-metrics ${session.type === "wordcloud" ? "wordcloud-metrics" : session.type === FREE_TEXT_TYPE ? "free-text-metrics" : ""}">
         <div class="metric-card countdown ${isSessionClosed(session) ? "closed" : ""}">
           <span>${isSessionClosed(session) ? "Votacion cerrada" : "Tiempo restante"}</span>
           <strong>${formatRemaining(session)}</strong>
@@ -2669,13 +2669,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v57")) return;
-    sessionStorage.setItem("retox.swReloaded.v57", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v58")) return;
+    sessionStorage.setItem("retox.swReloaded.v58", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=57", { updateViaCache: "none" })
+    .register("./sw.js?v=58", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })
