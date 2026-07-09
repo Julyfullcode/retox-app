@@ -855,7 +855,6 @@ function exportSessionResults(session) {
       rows: [
         ["Resumen", stats.summary || ""],
         ["Respuestas", stats.count],
-        ["Promedio palabras", stats.averageLength || 0],
         [],
         ["Analisis"],
         ...(stats.analysis || []).map((item) => [item]),
@@ -979,7 +978,8 @@ function extractWords(text, limit = 8) {
     "e", "el", "ella", "ellas", "ellos", "en", "entre", "era", "eres", "es", "esa", "esas", "ese", "eso", "esos",
     "esta", "estas", "este", "esto", "estos", "fue", "ha", "hay", "la", "las", "lo", "los", "mas", "me", "mi",
     "mis", "muy", "ni", "no", "nos", "o", "otra", "otro", "para", "pero", "por", "porque", "que", "se", "ser",
-    "si", "sin", "son", "su", "sus", "te", "tiene", "tu", "tus", "un", "una", "unas", "uno", "unos", "y", "ya"
+    "si", "sin", "son", "su", "sus", "te", "tiene", "tu", "tus", "un", "una", "unas", "uno", "unos", "y", "ya",
+    "ademas", "agregado", "aporta", "aportan", "aporte", "aportes", "comentario", "tema", "temas", "cosa", "cosas"
   ]);
   return String(text || "")
     .toLowerCase()
@@ -1010,17 +1010,7 @@ function computeFreeTextStats(session) {
   const responses = Object.values(session?.votes || {})
     .map((vote) => String(vote.answers?.text || "").trim())
     .filter(Boolean);
-  const counts = new Map();
-  responses.forEach((text) => {
-    extractWords(text, 120).forEach((word) => counts.set(word, (counts.get(word) || 0) + 1));
-  });
-  const allKeywords = [...counts.entries()]
-    .map(([text, count]) => ({ text, count }))
-    .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text));
-  const themes = freeTextThemes(responses, allKeywords);
-  const averageLength = responses.length
-    ? Math.round(responses.reduce((sum, text) => sum + text.split(/\s+/).filter(Boolean).length, 0) / responses.length)
-    : 0;
+  const themes = freeTextThemes(responses);
   return {
     average: responses.length,
     count: responses.length,
@@ -1029,46 +1019,69 @@ function computeFreeTextStats(session) {
     responses,
     keywords: themes.map((theme) => ({ text: theme.label, count: theme.count })),
     themes,
-    averageLength,
-    summary: freeTextSummary(responses, themes, averageLength),
+    summary: freeTextSummary(responses, themes),
     analysis: freeTextAnalysis(responses, themes),
     recommendations: freeTextRecommendations(themes)
   };
 }
 
-function freeTextThemes(responses, allKeywords) {
-  const minimumCount = responses.length >= 4 ? 2 : 1;
-  return allKeywords
-    .filter((word) => word.count >= minimumCount)
-    .slice(0, 5)
-    .map((word) => {
-      const relatedCounts = new Map();
-      responses
-        .filter((text) => extractWords(text, 120).includes(word.text))
-        .forEach((text) => {
-          extractWords(text, 120)
-            .filter((related) => related !== word.text)
-            .forEach((related) => relatedCounts.set(related, (relatedCounts.get(related) || 0) + 1));
-        });
-      const related = [...relatedCounts.entries()]
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .slice(0, 2)
-        .map(([text]) => text);
-      return {
-        label: word.text,
-        count: word.count,
-        detail: related.length
-          ? `Se relaciona con ${related.join(" y ")}.`
-          : "Aparece como idea recurrente en las respuestas."
-      };
+function freeTextThemes(responses) {
+  const counts = new Map();
+  responses.forEach((text) => {
+    meaningfulPhrases(text).forEach((phrase) => {
+      const key = normalizePhrase(phrase);
+      if (!key) return;
+      const current = counts.get(key) || { label: phrase, count: 0 };
+      counts.set(key, { ...current, count: current.count + 1 });
     });
+  });
+  return [...counts.values()]
+    .filter((theme) => theme.label.split(/\s+/).length >= 2)
+    .sort((a, b) => b.count - a.count || b.label.length - a.label.length)
+    .slice(0, 5)
+    .map((theme) => ({
+      ...theme,
+      detail: theme.count > 1
+        ? "Aparece como una idea repetida en varias respuestas."
+        : "Surge como una idea concreta dentro de las respuestas."
+    }));
 }
 
-function freeTextSummary(responses, themes, averageLength) {
+function meaningfulPhrases(text) {
+  return String(text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[.!?;:()]/g, ",")
+    .split(/,|\bpero\b|\bademas\b|\btambien\b|\by\b/)
+    .map((part) => cleanFreeTextPhrase(part))
+    .filter((phrase) => phrase.split(/\s+/).length >= 2)
+    .slice(0, 8);
+}
+
+function cleanFreeTextPhrase(value) {
+  return String(value || "")
+    .replace(/[^a-z0-9\u00f1\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^(me parece|considero|creo que|pienso que|opino que)\s+/i, "")
+    .replace(/^(es|seria|resulta|queda|fue)\s+/i, "")
+    .replace(/^(un|una|el|la|los|las)\s+/i, "")
+    .replace(/^(se debe|debe|deben|hay que|importante|es importante)\s+/i, "")
+    .replace(/^(seguir|continuar|trabajar|trabajando)\s+(en\s+)?/i, "")
+    .trim();
+}
+
+function normalizePhrase(value) {
+  const words = extractWords(value, 12).filter((word) => !["ademas", "agregado", "aporta", "aporte"].includes(word));
+  return words.length >= 2 ? words.join(" ") : "";
+}
+
+function freeTextSummary(responses, themes) {
   if (!responses.length) return "Aun no hay respuestas. Cuando empiecen a llegar, aqui aparecera un resumen automatico de los temas principales.";
   if (!themes.length) return `Hay ${responses.length} respuestas registradas, pero todavia no hay un patron repetido claro. Conviene leerlas como insumos exploratorios y esperar mas participacion.`;
   const themeText = themes.slice(0, 3).map((theme) => theme.label).join(", ");
-  return `En ${responses.length} respuestas, la conversacion se concentra principalmente en ${themeText}. Las respuestas tienen en promedio ${averageLength} palabras, suficiente para detectar tendencias sin mostrar cada texto individual.`;
+  return `En ${responses.length} respuestas, la lectura principal se concentra en ${themeText}. Estos puntos sintetizan las ideas accionables mas visibles frente a la pregunta.`;
 }
 
 function freeTextAnalysis(responses, themes) {
@@ -1080,8 +1093,8 @@ function freeTextAnalysis(responses, themes) {
 function freeTextRecommendations(themes) {
   if (!themes.length) return ["Recoger mas respuestas para identificar patrones con mayor confianza."];
   return [
-    `Priorizar acciones alrededor de ${themes[0].label}.`,
-    themes[1] ? `Cruzar ${themes[0].label} con ${themes[1].label} para entender si hacen parte del mismo problema.` : "Profundizar con una pregunta de seguimiento sobre el tema principal.",
+    `Profundizar en ${themes[0].label} con una pregunta de seguimiento.`,
+    themes[1] ? `Validar si ${themes[0].label} y ${themes[1].label} requieren una accion conjunta.` : "Identificar responsables y alcance para el tema principal.",
     "Cerrar la conversacion con compromisos concretos y responsables visibles."
   ];
 }
@@ -1944,7 +1957,7 @@ function freeTextResultsPanel(stats) {
         <div>
           ${
             stats.themes?.length
-              ? stats.themes.map((theme) => `<span>${escapeHtml(theme.label)} <b>${theme.count}</b></span>`).join("")
+              ? stats.themes.map((theme) => `<span>${escapeHtml(theme.label)}</span>`).join("")
               : `<small class="muted">Esperando respuestas</small>`
           }
         </div>
@@ -2645,13 +2658,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v55")) return;
-    sessionStorage.setItem("retox.swReloaded.v55", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v56")) return;
+    sessionStorage.setItem("retox.swReloaded.v56", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=55", { updateViaCache: "none" })
+    .register("./sw.js?v=56", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })
