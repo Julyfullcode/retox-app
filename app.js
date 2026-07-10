@@ -1380,7 +1380,7 @@ function hostMenuView() {
   return `
     <main class="admin-layout">
       ${roomHeader({ code: "Host" })}
-      <section class="host-menu">
+      <section class="host-menu host-main-menu">
         ${hostActionCard("create", "Crear encuesta", "Configura escala, quiz, nube, texto libre o perfil digital para compartir en vivo.", "chart")}
         ${hostActionCard("history", "Historial", "Consulta resultados, QR, enlaces, Excel y elimina encuestas.", "archive")}
       </section>
@@ -1393,8 +1393,8 @@ function surveyTypeChoiceView() {
   return `
     <main class="admin-layout">
       ${roomHeader({ code: "Host" })}
-      <section class="host-menu">
-        ${hostActionCard("scale", "Escala", "Votacion numerica del 1 al 10 con promedio y distribucion.", "scale")}
+      <section class="host-menu host-type-menu">
+        ${hostActionCard("scale", "Escala", "Votación numérica del 1 al 10 con promedio y distribución.", "scale")}
         ${hostActionCard("quiz", "Quiz", "Preguntas con respuestas correctas, puntos y puntaje final.", "quiz")}
         ${hostActionCard("wordcloud", "Nube de palabras", "Respuestas abiertas que forman una figura según frecuencia.", "wordcloud")}
         ${hostActionCard(FREE_TEXT_TYPE, "Texto libre", "Preguntas abiertas con resumen y análisis de respuestas.", "text")}
@@ -2764,13 +2764,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v66")) return;
-    sessionStorage.setItem("retox.swReloaded.v66", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v67")) return;
+    sessionStorage.setItem("retox.swReloaded.v67", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=66", { updateViaCache: "none" })
+    .register("./sw.js?v=67", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })
