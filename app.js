@@ -1010,7 +1010,7 @@ function computeFreeTextStats(session) {
   const responses = Object.values(session?.votes || {})
     .map((vote) => String(vote.answers?.text || "").trim())
     .filter(Boolean);
-  const themes = freeTextThemes(responses);
+  const { themes, coveredCount } = freeTextThemes(responses);
   return {
     average: responses.length,
     count: responses.length,
@@ -1019,8 +1019,9 @@ function computeFreeTextStats(session) {
     responses,
     keywords: themes.map((theme) => ({ text: theme.label, count: theme.count })),
     themes,
-    summary: freeTextSummary(responses, themes),
-    analysis: freeTextAnalysis(responses, themes),
+    coveredCount,
+    summary: freeTextSummary(responses, themes, coveredCount),
+    analysis: freeTextAnalysis(responses, themes, coveredCount),
     recommendations: freeTextRecommendations(themes)
   };
 }
@@ -1029,26 +1030,26 @@ function freeTextThemes(responses) {
   const categories = [
     {
       key: "commercial",
-      label: "Ampliacion del foco comercial",
+      label: "Ampliación del foco comercial",
       detail: "Las respuestas apuntan a fortalecer la mirada comercial, ampliar oportunidades y conectar mejor la propuesta con necesidades del negocio.",
       keywords: ["comercial", "mercado", "cliente", "clientes", "venta", "ventas", "negocio", "oferta", "foco", "ampliar", "oportunidad", "oportunidades"]
     },
     {
       key: "capabilities",
-      label: "Validacion de capacidades y dimensionamiento",
+      label: "Validación de capacidades y dimensionamiento",
       detail: "Se identifica la necesidad de revisar capacidades, alcance, recursos y dimensionamiento antes de avanzar.",
       keywords: ["capacidad", "capacidades", "dimensionamiento", "dimensionar", "alcance", "recursos", "recurso", "equipo", "validar", "viabilidad", "carga"]
     },
     {
       key: "experience",
       label: "Experiencia y valor para el grupo",
-      detail: "Los aportes resaltan el valor de la experiencia, el aprendizaje colectivo y la contribucion al grupo.",
-      keywords: ["experiencia", "grupo", "aporte", "aportes", "valor", "valioso", "aprendizaje", "participación", "dinámica", "ejercicio"]
+      detail: "Los aportes resaltan el valor de la experiencia, el aprendizaje colectivo y la contribución al grupo.",
+      keywords: ["experiencia", "grupo", "aporte", "aportes", "valor", "valioso", "aprendizaje", "participacion", "dinamica", "ejercicio"]
     },
     {
       key: "clarity",
-      label: "Claridad y alineacion",
-      detail: "Aparece la necesidad de alinear expectativas, precisar mensajes y dejar mas claro el camino de trabajo.",
+      label: "Claridad y alineación",
+      detail: "Aparece la necesidad de alinear expectativas, precisar mensajes y dejar más claro el camino de trabajo.",
       keywords: ["claro", "clara", "claridad", "alinear", "alineacion", "mensaje", "mensajes", "instrucciones", "entender", "explicar"]
     },
     {
@@ -1060,56 +1061,79 @@ function freeTextThemes(responses) {
     {
       key: "improvement",
       label: "Oportunidades de mejora",
-      detail: "Se observan oportunidades para ajustar el proceso, mejorar la ejecucion y fortalecer el resultado esperado.",
+      detail: "Se observan oportunidades para ajustar el proceso, mejorar la ejecución y fortalecer el resultado esperado.",
       keywords: ["mejorar", "mejora", "oportunidad", "oportunidades", "ajustar", "fortalecer", "trabajar", "profundizar", "desarrollar"]
     }
   ];
 
-  const scored = categories.map((category) => {
-    const count = responses.filter((text) => {
-      const words = new Set(extractWords(text, 160));
-      return category.keywords.some((keyword) => words.has(keyword));
-    }).length;
-    return { ...category, count };
+  const matchedByResponse = responses.map((text) => {
+    const words = new Set(extractWords(text, 160));
+    return categories
+      .filter((category) => category.keywords.some((keyword) => words.has(keyword)))
+      .map((category) => category.key);
   });
 
+  const scored = categories.map((category) => ({
+    ...category,
+    count: matchedByResponse.filter((keys) => keys.includes(category.key)).length
+  }));
+  const coveredCount = matchedByResponse.filter((keys) => keys.length).length;
+  const uncoveredCount = Math.max(0, responses.length - coveredCount);
   const detected = scored
     .filter((theme) => theme.count > 0)
     .sort((a, b) => b.count - a.count || b.label.length - a.label.length)
     .slice(0, 4);
 
-  if (detected.length) return detected;
-  if (!responses.length) return [];
-  return [{
-    key: "general",
-    label: "Insumos cualitativos generales",
-    count: responses.length,
-    detail: "Las respuestas entregan percepciones utiles, pero aún no forman una tendencia tematica clara."
-  }];
+  if (uncoveredCount) {
+    detected.push({
+      key: "complementary",
+      label: "Aportes complementarios",
+      count: uncoveredCount,
+      detail: "También se registran aportes adicionales que no se agrupan en una categoría dominante, pero enriquecen la lectura cualitativa."
+    });
+  }
+
+  if (detected.length) return { themes: detected, coveredCount };
+  if (!responses.length) return { themes: [], coveredCount: 0 };
+  return {
+    coveredCount: 0,
+    themes: [{
+      key: "general",
+      label: "Insumos cualitativos generales",
+      count: responses.length,
+      detail: "Las respuestas entregan percepciones útiles, pero aún no forman una tendencia temática clara."
+    }]
+  };
 }
 
-function freeTextSummary(responses, themes) {
+function freeTextSummary(responses, themes, coveredCount = 0) {
   if (!responses.length) return "Aún no hay respuestas. Cuando empiecen a llegar, aquí aparecerá un resumen automático de los temas principales.";
   if (!themes.length) return `Hay ${responses.length} respuestas registradas, pero todavía no hay un patrón repetido claro. Conviene leerlas como insumos exploratorios y esperar más participación.`;
   const themeText = themes.slice(0, 3).map((theme) => theme.label.toLowerCase()).join(", ");
-  return `A partir de ${responses.length} respuestas, la lectura ejecutiva se concentra en ${themeText}.`;
+  const coverage = coveredCount && coveredCount < responses.length ? ` Además, ${responses.length - coveredCount} respuesta(s) agregan matices complementarios.` : "";
+  return `A partir de ${responses.length} respuestas, la lectura ejecutiva se concentra en ${themeText}.${coverage}`;
 }
 
-function freeTextAnalysis(responses, themes) {
+function freeTextAnalysis(responses, themes, coveredCount = 0) {
   if (!responses.length) return ["El análisis aparecerá cuando lleguen las primeras respuestas."];
   if (!themes.length) return ["Las respuestas son variadas y aún no forman una tendencia dominante.", "Se recomienda esperar más participación antes de sacar conclusiones."];
-  return themes.slice(0, 3).map((theme) => `${theme.label}: ${theme.detail}`);
+  const coverageLine = coveredCount < responses.length
+    ? `El análisis incorpora ${responses.length} respuestas: ${coveredCount} se agrupan en temas principales y ${responses.length - coveredCount} aportan elementos complementarios.`
+    : `El análisis incorpora las ${responses.length} respuestas recibidas.`;
+  return [coverageLine, ...themes.slice(0, 3).map((theme) => `${theme.label}: ${theme.detail}`)];
 }
 
 function freeTextRecommendations(themes) {
-  if (!themes.length) return ["Recoger mas respuestas para identificar patrónes con mayor confianza."];
+  if (!themes.length) return ["Recoger más respuestas para identificar patrones con mayor confianza."];
+  const mainThemes = themes.filter((theme) => theme.key !== "complementary");
+  const first = mainThemes[0] || themes[0];
+  const second = mainThemes[1];
   return [
-    `Profundizar en ${themes[0].label.toLowerCase()} con una pregunta de seguimiento.`,
-    themes[1] ? `Validar si ${themes[0].label.toLowerCase()} y ${themes[1].label.toLowerCase()} requieren una acción conjunta.` : "Identificar responsables y alcance para el tema principal.",
+    `Profundizar en ${first.label.toLowerCase()} con una pregunta de seguimiento.`,
+    second ? `Validar si ${first.label.toLowerCase()} y ${second.label.toLowerCase()} requieren una acción conjunta.` : "Identificar responsables y alcance para el tema principal.",
     "Cerrar la conversación con compromisos concretos y responsables visibles."
   ];
 }
-
 function capitalize(text) {
   const value = String(text || "");
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
@@ -1706,7 +1730,7 @@ function thankYouContent() {
       <div>
         <p class="eyebrow">Respuesta recibida</p>
         <h2>¡Gracias por tu aporte!</h2>
-        <p>Desde la Vicepresidencia Experiencia Usuario Cliente buscamos escuchar tu voz para mejorar cada interacción y construir experiencias más simples, cercanas y útiles para todos.</p>
+        <p>En el Grupo EPM ponemos a las personas en el centro de todo lo que hacemos. Por eso trabajamos para hacer todo más simple, con responsabilidad, transparencia y calidez.</p>
       </div>
     </div>
   `;
@@ -2738,13 +2762,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v63")) return;
-    sessionStorage.setItem("retox.swReloaded.v63", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v65")) return;
+    sessionStorage.setItem("retox.swReloaded.v65", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=63", { updateViaCache: "none" })
+    .register("./sw.js?v=65", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })
