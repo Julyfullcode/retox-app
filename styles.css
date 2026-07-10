@@ -801,6 +801,31 @@ fieldset {
   color: var(--blue);
 }
 
+.sent-answer {
+  display: grid;
+  gap: 3px;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 10px;
+  border: 1px solid color-mix(in srgb, var(--blue) 22%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--blue) 8%, var(--card));
+  padding: 8px 10px;
+}
+
+.sent-answer span {
+  color: var(--blue);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.sent-answer strong {
+  color: var(--ink);
+  font-size: clamp(0.95rem, 1.4vw, 1.1rem);
+  line-height: 1.25;
+}
+
 .wordcloud-side {
   min-width: 0;
   justify-items: center;
@@ -1727,23 +1752,23 @@ footer {
 
 .host-menu {
   display: grid;
-  grid-template-columns: repeat(2, minmax(240px, 1fr));
-  gap: 18px;
-  width: min(760px, 100%);
-  margin: clamp(28px, 7vh, 72px) auto 0;
+  grid-template-columns: repeat(3, minmax(210px, 1fr));
+  gap: 12px;
+  width: min(1040px, 100%);
+  margin: clamp(10px, 2.8vh, 28px) auto 0;
   align-items: stretch;
 }
 
 .host-card {
   display: grid;
   justify-items: center;
-  gap: 12px;
-  min-height: 310px;
+  gap: 8px;
+  min-height: 206px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: color-mix(in srgb, var(--card) 92%, transparent);
   color: var(--ink);
-  padding: 24px;
+  padding: 16px;
   box-shadow: var(--shadow);
   text-align: center;
 }
@@ -1754,32 +1779,32 @@ footer {
 
 .host-card strong {
   color: var(--green);
-  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-size: clamp(1.25rem, 2.5vw, 1.8rem);
 }
 
 .host-card small {
   max-width: 320px;
   color: var(--muted);
-  font-size: 1rem;
-  line-height: 1.35;
+  font-size: 0.86rem;
+  line-height: 1.25;
 }
 
 .host-card-art {
   display: grid;
   place-items: center;
-  width: 150px;
-  height: 150px;
+  width: 92px;
+  height: 92px;
   border-radius: 50%;
   background: linear-gradient(135deg, rgba(182, 226, 58, 0.82), rgba(11, 143, 72, 0.92));
   box-shadow: 0 18px 42px rgba(11, 143, 72, 0.2);
 }
 
 .host-card-art svg {
-  width: 112px;
-  height: 112px;
+  width: 66px;
+  height: 66px;
   fill: none;
   stroke: #fff;
-  stroke-width: 8;
+  stroke-width: 7;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -1944,6 +1969,10 @@ footer {
   .wordcloud-results-row,
   .free-text-results-row {
     grid-template-columns: 1fr;
+  }
+
+  .host-menu {
+    grid-template-columns: repeat(2, minmax(190px, 1fr));
   }
 }
 

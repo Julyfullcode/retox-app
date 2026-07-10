@@ -1659,7 +1659,7 @@ function waitingView(session) {
         }).join("")}
       </section>
       <section class="panel compact ${voted ? "thank-you-panel" : ""}">
-        ${voted ? thankYouContent() : `<strong>${closed ? "La votación ya no acepta respuestas" : "Selecciona un valor de 1 a 10"}</strong>`}
+        ${voted ? thankYouContent(`Calificación enviada: ${session.votes[appState.user.id].value}`) : `<strong>${closed ? "La votación ya no acepta respuestas" : "Selecciona un valor de 1 a 10"}</strong>`}
         ${voted ? "" : `<div class="mini-result">
           ${thermometer(stats.average)}
           ${histogram(stats)}
@@ -1685,7 +1685,7 @@ function wordCloudParticipantView(session) {
       </section>
       ${
         voted
-          ? `<section class="panel compact thank-you-panel">${thankYouContent()}</section>`
+          ? `<section class="panel compact thank-you-panel">${thankYouContent(vote.answers?.text || "")}</section>`
           : `<form class="panel wordcloud-form" data-action="wordCloudSubmitForm">
               <label for="wordcloud-answer">Tu palabra o frase corta</label>
               <input id="wordcloud-answer" name="wordcloudAnswer" maxlength="80" placeholder="Ej: social media" value="${escapeHtml(draft)}" ${closed ? "disabled" : ""} />
@@ -1711,7 +1711,7 @@ function freeTextParticipantView(session) {
       </section>
       ${
         voted
-          ? `<section class="panel compact thank-you-panel">${thankYouContent()}</section>`
+          ? `<section class="panel compact thank-you-panel">${thankYouContent(session.votes[appState.user?.id]?.answers?.text || "")}</section>`
           : `<form class="panel free-text-form" data-action="freeTextSubmitForm">
               <label for="free-text-answer">Tu respuesta</label>
               <textarea id="free-text-answer" name="freeTextAnswer" rows="7" maxlength="1200" placeholder="Escribe aquí tu respuesta" ${closed ? "disabled" : ""}>${escapeHtml(draft)}</textarea>
@@ -1723,11 +1723,13 @@ function freeTextParticipantView(session) {
   `;
 }
 
-function thankYouContent() {
+function thankYouContent(answer = "") {
+  const cleanAnswer = String(answer || "").trim();
   return `
     <div class="thanks-card">
       <div class="thanks-character" aria-hidden="true">🙌</div>
       <div>
+        ${cleanAnswer ? `<div class="sent-answer"><span>Respuesta enviada</span><strong>${escapeHtml(shortText(cleanAnswer, 180))}</strong></div>` : ""}
         <p class="eyebrow">Respuesta recibida</p>
         <h2>¡Gracias por tu aporte!</h2>
         <p>En el Grupo EPM ponemos a las personas en el centro de todo lo que hacemos. Por eso trabajamos para hacer todo más simple, con responsabilidad, transparencia y calidez.</p>
@@ -1791,7 +1793,7 @@ function quizParticipantView(session) {
         voted
           ? `<section class="panel score-panel">
               <div class="score-mood" aria-hidden="true">${mood.icon}</div>
-              <strong>Gracias por tu respuesta</strong>
+              ${thankYouContent(`Puntaje enviado: ${vote.score} de ${maxScore}`)}
               <p class="eyebrow">${mood.label}</p>
               <h1>${vote.score}</h1>
               <p>Sobre ${maxScore} puntos posibles</p>
@@ -1880,7 +1882,7 @@ function digitalProfileResultCard(result, user) {
         <span class="result-avatar" title="${escapeHtml(avatarLabel)}">${avatarIcon}</span>
         <strong>${escapeHtml(user?.name || "Participante")}</strong>
       </div>
-      <p class="eyebrow">Gracias por tu respuesta</p>
+      ${thankYouContent(`Perfil obtenido: ${result.profile.label}`)}
       <p class="eyebrow">${escapeHtml(result.profile.tone)}</p>
       <h1>${escapeHtml(result.profile.label)}</h1>
       <div class="annual-value">
@@ -2762,13 +2764,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v65")) return;
-    sessionStorage.setItem("retox.swReloaded.v65", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v66")) return;
+    sessionStorage.setItem("retox.swReloaded.v66", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=65", { updateViaCache: "none" })
+    .register("./sw.js?v=66", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })
