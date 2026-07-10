@@ -1293,7 +1293,7 @@ function hostSetupView() {
       ${roomHeader({ code: "Host" })}
       <section class="host-portal">
         <form class="panel setup-panel" data-action="createSessionForm">
-          <p class="eyebrow">Crear sesión</p>
+          <p class="eyebrow">Crear sesion</p>
           <h1>${appState.surveyType === "quiz" ? "Nuevo quiz" : appState.surveyType === "wordcloud" ? "Nueva nube de palabras" : appState.surveyType === FREE_TEXT_TYPE ? "Nuevo texto libre" : appState.surveyType === DIGITAL_PROFILE_TYPE ? "Nuevo Perfil digital" : "Nueva escala"}</h1>
           <input type="hidden" name="type" value="${appState.surveyType}" />
           ${
@@ -1302,20 +1302,20 @@ function hostSetupView() {
                   <div class="quiz-builder" id="quiz-builder">
                     ${quizQuestionTemplate(0)}
                   </div>
-                  <label for="setup-duration">Tiempo máximo de vigencia en minutos</label>
+                  <label for="setup-duration">Tiempo maximo de vigencia en minutos</label>
                   <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                 </div>`
               : appState.surveyType === "wordcloud"
                 ? `<div class="scale-config">
                     <label for="setup-question">Pregunta</label>
                     <textarea id="setup-question" name="question" rows="3">Escribe una palabra o frase corta que represente esta experiencia</textarea>
-                    <label for="setup-duration">Tiempo máximo de vigencia en minutos</label>
+                    <label for="setup-duration">Tiempo maximo de vigencia en minutos</label>
                     <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                   </div>`
                 : appState.surveyType === FREE_TEXT_TYPE
                   ? `<div class="scale-config">
                     <label for="setup-question">Pregunta</label>
-                    <textarea id="setup-question" name="question" rows="3">Comparte tu opiniÃ³n sobre esta experiencia</textarea>
+                    <textarea id="setup-question" name="question" rows="3">Comparte tu opinion sobre esta experiencia</textarea>
                     <label for="setup-duration">Tiempo maximo de vigencia en minutos</label>
                     <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                   </div>`
@@ -1334,17 +1334,17 @@ function hostSetupView() {
                   <textarea id="setup-question" name="question" rows="3">${defaultQuestion}</textarea>
                   <div class="setup-inline-fields">
                     <label class="field" for="setup-scale-max">
-                      <span>Número máximo de escala</span>
+                      <span>Numero maximo de escala</span>
                       <input id="setup-scale-max" name="scaleMax" type="number" min="2" max="10" value="10" />
                     </label>
                     <label class="field" for="setup-duration">
-                      <span>Tiempo máximo de vigencia en minutos</span>
+                      <span>Tiempo maximo de vigencia en minutos</span>
                       <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                     </label>
                   </div>
                 </div>`
           }
-          <button class="primary full create-session-button" type="submit">Crear sesión</button>
+          <button class="primary full create-session-button" type="submit">Crear sesion</button>
         </form>
       </section>
       ${footer()}
@@ -1676,19 +1676,18 @@ function wordCloudParticipantView(session) {
 function freeTextParticipantView(session) {
   const voted = Boolean(session.votes[appState.user?.id]);
   const closed = isSessionClosed(session);
-  const vote = session.votes[appState.user?.id];
   const draft = appState.freeTextDraft?.[session.code] || "";
   return `
     <main class="app-grid">
       ${roomHeader(session)}
       <section class="panel question-panel">
-        <p class="eyebrow">Texto libre Â· ${closed ? "Cerrada" : `Tiempo restante ${formatRemaining(session)}`}</p>
+        <p class="eyebrow">Texto libre - ${closed ? "Cerrada" : `Tiempo restante ${formatRemaining(session)}`}</p>
         <h1>${escapeHtml(session.question)}</h1>
         <p>${Object.keys(session.votes || {}).length} respuestas recibidas</p>
       </section>
       ${
         voted
-          ? `<section class="panel compact"><strong>Tu respuesta quedÃ³ registrada</strong><p>${escapeHtml(vote.answers?.text || "")}</p></section>`
+          ? `<section class="panel compact thank-you-panel"><strong>Gracias por tu respuesta</strong><p>Tu aporte quedo registrado correctamente.</p></section>`
           : `<form class="panel free-text-form" data-action="freeTextSubmitForm">
               <label for="free-text-answer">Tu respuesta</label>
               <textarea id="free-text-answer" name="freeTextAnswer" rows="7" maxlength="1200" placeholder="Escribe aqui tu respuesta" ${closed ? "disabled" : ""}>${escapeHtml(draft)}</textarea>
@@ -1949,7 +1948,6 @@ function resultsSidePanel(session) {
 function freeTextResultsPanel(stats) {
   return `
     <div class="panel results-side free-text-results-side">
-      <h2>AnÃ¡lisis de textos</h2>
       <h2 class="free-text-title">Analisis de textos</h2>
       <div class="free-text-analysis">
         <strong>Resumen ejecutivo</strong>
@@ -2226,7 +2224,7 @@ function liveResultsPanel(session) {
   const people = isDigitalProfile ? votedPeople(session) : votedPeople(session).slice(-5);
   const links = sessionLinks(session.code);
   return `
-    <div class="results-stage ${session.type === "wordcloud" ? "wordcloud-stage" : ""}">
+    <div class="results-stage ${session.type === "wordcloud" ? "wordcloud-stage" : session.type === FREE_TEXT_TYPE ? "free-text-stage" : ""}">
       <h2 class="live-question">${escapeHtml(session.question)}</h2>
       <div class="live-metrics ${session.type === "wordcloud" ? "wordcloud-metrics" : session.type === FREE_TEXT_TYPE ? "free-text-metrics" : ""}">
         <div class="metric-card countdown ${isSessionClosed(session) ? "closed" : ""}">
@@ -2336,7 +2334,7 @@ function footer() {
 }
 
 function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (char) => ({
+  return repairTextEncoding(value).replace(/[&<>"']/g, (char) => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
@@ -2345,10 +2343,71 @@ function escapeHtml(value) {
   })[char]);
 }
 
+function repairEncoding(value) {
+  return String(value ?? "")
+    .replaceAll("ÃƒÂ¡", "á")
+    .replaceAll("ÃƒÂ©", "é")
+    .replaceAll("ÃƒÂ­", "í")
+    .replaceAll("ÃƒÂ³", "ó")
+    .replaceAll("ÃƒÂº", "ú")
+    .replaceAll("ÃƒÂ±", "ñ")
+    .replaceAll("Ã‚Â·", "-")
+    .replaceAll("Ã¡", "á")
+    .replaceAll("Ã©", "é")
+    .replaceAll("Ã­", "í")
+    .replaceAll("Ã³", "ó")
+    .replaceAll("Ãº", "ú")
+    .replaceAll("Ã±", "ñ")
+    .replaceAll("Ã", "Á")
+    .replaceAll("Ã‰", "É")
+    .replaceAll("Ã", "Í")
+    .replaceAll("Ã“", "Ó")
+    .replaceAll("Ãš", "Ú")
+    .replaceAll("Ã‘", "Ñ")
+    .replaceAll("Ã¼", "ü")
+    .replaceAll("Â·", "-")
+    .replaceAll("Â¿", "¿")
+    .replaceAll("Â¡", "¡")
+    .replaceAll("Â", "");
+}
+
+function repairTextEncoding(value) {
+  let text = String(value ?? "");
+  const replacements = [
+    ["\u00c3\u0192\u00c2\u00a1", "\u00e1"],
+    ["\u00c3\u0192\u00c2\u00a9", "\u00e9"],
+    ["\u00c3\u0192\u00c2\u00ad", "\u00ed"],
+    ["\u00c3\u0192\u00c2\u00b3", "\u00f3"],
+    ["\u00c3\u0192\u00c2\u00ba", "\u00fa"],
+    ["\u00c3\u0192\u00c2\u00b1", "\u00f1"],
+    ["\u00c3\u00a1", "\u00e1"],
+    ["\u00c3\u00a9", "\u00e9"],
+    ["\u00c3\u00ad", "\u00ed"],
+    ["\u00c3\u00b3", "\u00f3"],
+    ["\u00c3\u00ba", "\u00fa"],
+    ["\u00c3\u00b1", "\u00f1"],
+    ["\u00c3\u0081", "\u00c1"],
+    ["\u00c3\u0089", "\u00c9"],
+    ["\u00c3\u008d", "\u00cd"],
+    ["\u00c3\u0093", "\u00d3"],
+    ["\u00c3\u009a", "\u00da"],
+    ["\u00c3\u0091", "\u00d1"],
+    ["\u00c3\u00bc", "\u00fc"],
+    ["\u00c2\u00b7", "-"],
+    ["\u00c2\u00bf", "\u00bf"],
+    ["\u00c2\u00a1", "\u00a1"],
+    ["\u00c2", ""]
+  ];
+  replacements.forEach(([broken, fixed]) => {
+    text = text.split(broken).join(fixed);
+  });
+  return text;
+}
+
 function toast(message) {
   const node = document.createElement("div");
   node.className = "toast";
-  node.textContent = message;
+  node.textContent = repairTextEncoding(message);
   document.body.appendChild(node);
   setTimeout(() => node.remove(), 2200);
 }
@@ -2472,6 +2531,7 @@ function render() {
   }
   const digitalResultsSide = document.querySelector(".digital-results-side");
   if (digitalResultsSide) digitalResultsSide.scrollTop = digitalResultsScroll;
+  repairRenderedEncoding(root);
 }
 
 function shouldPauseRenderForWordCloudInput() {
@@ -2492,6 +2552,20 @@ function shouldPauseRenderForWordCloudInput() {
     return appState.view === "waiting" && session?.type === FREE_TEXT_TYPE && !session.votes?.[appState.user?.id];
   }
   return false;
+}
+
+function repairRenderedEncoding(root = document.body) {
+  root.querySelectorAll("input, textarea").forEach((field) => {
+    const fixed = repairTextEncoding(field.value);
+    if (field.value !== fixed) field.value = fixed;
+  });
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach((node) => {
+    const fixed = repairTextEncoding(node.nodeValue);
+    if (node.nodeValue !== fixed) node.nodeValue = fixed;
+  });
 }
 
 document.addEventListener("click", async (event) => {
@@ -2669,13 +2743,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v58")) return;
-    sessionStorage.setItem("retox.swReloaded.v58", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v61")) return;
+    sessionStorage.setItem("retox.swReloaded.v61", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=58", { updateViaCache: "none" })
+    .register("./sw.js?v=61", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })
