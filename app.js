@@ -1635,12 +1635,11 @@ function waitingView(session) {
         }).join("")}
       </section>
       <section class="panel compact ${voted ? "thank-you-panel" : ""}">
-        <strong>${closed ? "La votación ya no acepta respuestas" : voted ? "Gracias por tu respuesta" : "Selecciona un valor de 1 a 10"}</strong>
-        ${voted ? `<p>Tu aporte quedó registrado correctamente.</p>` : ""}
-        <div class="mini-result">
+        ${voted ? thankYouContent() : `<strong>${closed ? "La votación ya no acepta respuestas" : "Selecciona un valor de 1 a 10"}</strong>`}
+        ${voted ? "" : `<div class="mini-result">
           ${thermometer(stats.average)}
           ${histogram(stats)}
-        </div>
+        </div>`}
       </section>
       ${footer()}
     </main>
@@ -1662,7 +1661,7 @@ function wordCloudParticipantView(session) {
       </section>
       ${
         voted
-          ? `<section class="panel compact thank-you-panel"><strong>Gracias por tu respuesta</strong><p>Tu aporte quedó registrado correctamente.</p></section>`
+          ? `<section class="panel compact thank-you-panel">${thankYouContent()}</section>`
           : `<form class="panel wordcloud-form" data-action="wordCloudSubmitForm">
               <label for="wordcloud-answer">Tu palabra o frase corta</label>
               <input id="wordcloud-answer" name="wordcloudAnswer" maxlength="80" placeholder="Ej: social media" value="${escapeHtml(draft)}" ${closed ? "disabled" : ""} />
@@ -1688,7 +1687,7 @@ function freeTextParticipantView(session) {
       </section>
       ${
         voted
-          ? `<section class="panel compact thank-you-panel"><strong>Gracias por tu respuesta</strong><p>Tu aporte quedó registrado correctamente.</p></section>`
+          ? `<section class="panel compact thank-you-panel">${thankYouContent()}</section>`
           : `<form class="panel free-text-form" data-action="freeTextSubmitForm">
               <label for="free-text-answer">Tu respuesta</label>
               <textarea id="free-text-answer" name="freeTextAnswer" rows="7" maxlength="1200" placeholder="Escribe aquí tu respuesta" ${closed ? "disabled" : ""}>${escapeHtml(draft)}</textarea>
@@ -1697,6 +1696,19 @@ function freeTextParticipantView(session) {
       }
       ${footer()}
     </main>
+  `;
+}
+
+function thankYouContent() {
+  return `
+    <div class="thanks-card">
+      <div class="thanks-character" aria-hidden="true">🙌</div>
+      <div>
+        <p class="eyebrow">Respuesta recibida</p>
+        <h2>¡Gracias por tu aporte!</h2>
+        <p>Desde la Vicepresidencia Experiencia Usuario Cliente buscamos escuchar tu voz para mejorar cada interacción y construir experiencias más simples, cercanas y útiles para todos.</p>
+      </div>
+    </div>
   `;
 }
 
@@ -2726,13 +2738,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v62")) return;
-    sessionStorage.setItem("retox.swReloaded.v62", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v63")) return;
+    sessionStorage.setItem("retox.swReloaded.v63", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=62", { updateViaCache: "none" })
+    .register("./sw.js?v=63", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })

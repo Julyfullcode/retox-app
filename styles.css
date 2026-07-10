@@ -753,6 +753,54 @@ fieldset {
   color: var(--blue);
 }
 
+.thank-you-panel {
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--green) 34%, var(--line));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--green-2) 20%, transparent), color-mix(in srgb, var(--blue) 12%, transparent)),
+    var(--card);
+}
+
+.thanks-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+}
+
+.thanks-character {
+  display: grid;
+  place-items: center;
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.4)),
+    linear-gradient(135deg, var(--green-2), var(--green));
+  box-shadow: 0 16px 34px rgba(11, 143, 72, 0.24);
+  font-size: 2.4rem;
+}
+
+.thanks-card h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.55rem, 3vw, 2.25rem);
+  line-height: 1.05;
+}
+
+.thanks-card p {
+  max-width: 980px;
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: clamp(1rem, 1.45vw, 1.2rem);
+  line-height: 1.38;
+}
+
+.thanks-card .eyebrow {
+  margin: 0 0 4px;
+  color: var(--blue);
+}
+
 .wordcloud-side {
   min-width: 0;
   justify-items: center;
@@ -1971,6 +2019,17 @@ footer {
 
   .share-row {
     grid-template-columns: 1fr;
+  }
+
+  .thanks-card {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .thanks-character {
+    width: 76px;
+    height: 76px;
   }
 
   .brand-mark {
