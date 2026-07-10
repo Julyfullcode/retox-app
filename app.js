@@ -38,7 +38,7 @@ const avatars = [
 ];
 
 const sampleNames = ["Ana", "Luis", "Mafe", "Carlos", "Sofi", "Juli", "Diana", "Mateo"];
-const defaultQuestion = "Del 1 al 10, ¿como calificas esta experiencia?";
+const defaultQuestion = "Del 1 al 10, ¿cómo calificas esta experiencia?";
 const DIGITAL_PROFILE_TYPE = "digitalprofile";
 const FREE_TEXT_TYPE = "freetext";
 const digitalProfileSurvey = {
@@ -48,7 +48,7 @@ const digitalProfileSurvey = {
       text: "Como recibes la factura de EPM?",
       options: [
         { id: "door", text: "En la puerta de mi casa", value: 11377 },
-        { id: "email", text: "Por correo electronico o whatsapp", value: 408 }
+        { id: "email", text: "Por correo electrónico o whatsapp", value: 408 }
       ]
     },
     {
@@ -56,16 +56,16 @@ const digitalProfileSurvey = {
       options: [
         { id: "portal", text: "Utilizas el portal de factura web de EPM", value: 0 },
         { id: "gana", text: "Vas a un gana, coofinep, cotrafa, etc.", value: 9228 },
-        { id: "debit", text: "Tienes debito automatico con tu entidad financiera", value: 2664 },
+        { id: "debit", text: "Tienes débito automático con tu entidad financiera", value: 2664 },
         { id: "bank", text: "Vas a la taquilla del banco", value: 5124 }
       ]
     },
     {
-      text: "Cuando quieres comunicarte con EPM, a traves de que medio lo haces?",
+      text: "Cuando quieres comunicarte con EPM, ¿a través de qué medio lo haces?",
       options: [
         { id: "ema", text: "Le escribo a EMA", value: 5106 },
         { id: "office", text: "Acudo a una oficina", value: 600000 },
-        { id: "web", text: "Acudo a la pagina web", value: 19860 },
+        { id: "web", text: "Acudo a la página web", value: 19860 },
         { id: "letter", text: "Radico una carta", value: 600000 },
         { id: "contact", text: "Llamo al contact center", value: 50304 }
       ]
@@ -224,7 +224,7 @@ async function loadRemoteSessions() {
       supabaseClient.from(SUPABASE_VOTES_TABLE).select("*").in("session_code", codes)
     ]);
     if (participantsError || votesError) {
-      console.warn("Faltan tablas escalables de Retox, usando datos de sesion:", participantsError?.message || votesError?.message);
+      console.warn("Faltan tablas escalables de Retox, usando datos de sesión:", participantsError?.message || votesError?.message);
     } else {
       Object.keys(sessions).forEach((code) => {
         sessions[code] = hydrateSession(
@@ -251,7 +251,7 @@ async function fetchSessionConfig(code) {
   if (isSessionDeletedLocally(normalized)) return null;
   const { data, error } = await supabaseClient.from(SUPABASE_TABLE).select("code,data").eq("code", normalized).maybeSingle();
   if (error) {
-    console.warn("No pude consultar la sesion:", error.message);
+    console.warn("No pude consultar la sesión:", error.message);
     return null;
   }
   if (!data) return null;
@@ -546,12 +546,12 @@ async function createSession(options = {}) {
 async function joinSession(code) {
   const normalized = String(code || "").trim().toUpperCase();
   if (!normalized) {
-    toast("Ingresa el codigo de la sesion.");
+    toast("Ingresa el código de la sesión.");
     return;
   }
   const session = getSession(normalized) || await fetchSessionConfig(normalized);
   if (!session) {
-    toast("No encuentro esa sesion. Revisa el codigo.");
+    toast("No encuentro esa sesión. Revisa el código.");
     return;
   }
   appState = { ...appState, code: normalized, view: appState.user ? "waiting" : "identify", hostMode: false };
@@ -584,17 +584,17 @@ async function vote(value) {
   if (!appState.user) return;
   const current = await fetchSessionConfig(appState.code) || getSession(appState.code);
   if (isSessionClosed(current)) {
-    toast("La votacion ya esta cerrada.");
+    toast("La votación ya está cerrada.");
     render();
     return;
   }
   if (current.votes?.[appState.user.id]) {
-    toast("Tu voto ya quedo registrado.");
+    toast("Tu voto ya quedó registrado.");
     render();
     return;
   }
   const saved = await saveScaleVote(appState.code, appState.user, value, current.round);
-  toast(saved ? `Voto enviado: ${value}` : "Tu voto ya quedo registrado.");
+  toast(saved ? `Voto enviado: ${value}` : "Tu voto ya quedó registrado.");
   render();
 }
 
@@ -741,11 +741,11 @@ async function addDemoVotes() {
       } else if (session.type === FREE_TEXT_TYPE) {
         const samples = [
           "La experiencia fue clara y cercana, pero seria bueno tener mas acompanamiento al inicio.",
-          "Me gusto la dinamica porque permite expresar ideas y escuchar a otros participantes.",
+          "Me gustó la dinámica porque permite expresar ideas y escuchar a otros participantes.",
           "El punto mas importante es mejorar la velocidad de respuesta y dar instrucciones mas simples.",
           "La actividad ayuda a identificar oportunidades, especialmente en comunicacion y seguimiento.",
           "Seria valioso cerrar con compromisos concretos para que las ideas no se pierdan.",
-          "Destaco la participacion del grupo y la posibilidad de compartir opiniones sin complicaciones."
+          "Destaco la participación del grupo y la posibilidad de compartir opiniones sin complicaciones."
         ];
         await saveFreeTextVote(appState.code, user, samples[index % samples.length], session.round);
       } else if (session.type === DIGITAL_PROFILE_TYPE) {
@@ -833,9 +833,9 @@ function exportSessionResults(session) {
         [session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" || session.type === FREE_TEXT_TYPE ? "Respuestas" : session.type === DIGITAL_PROFILE_TYPE ? "Valor promedio" : "Promedio", stats.count ? stats.average.toFixed(2) : ""],
         ["Participantes", participants.length],
         ["Respuestas", stats.count],
-        ...(session.type === "quiz" ? [["Puntaje maximo", stats.maxScore]] : []),
+        ...(session.type === "quiz" ? [["Puntaje máximo", stats.maxScore]] : []),
         [],
-        ["Nombre", "Avatar", session.type === "quiz" ? "Puntaje" : session.type === DIGITAL_PROFILE_TYPE ? "Valor estimado" : "Voto", session.type === FREE_TEXT_TYPE ? "Texto libre" : "Texto nube", "Perfil digital", "Fecha respuesta", "Pregunta", "Codigo sesion", "Ronda"],
+        ["Nombre", "Avatar", session.type === "quiz" ? "Puntaje" : session.type === DIGITAL_PROFILE_TYPE ? "Valor estimado" : "Voto", session.type === FREE_TEXT_TYPE ? "Texto libre" : "Texto nube", "Perfil digital", "Fecha respuesta", "Pregunta", "Código sesión", "Ronda"],
         ...rows
       ]
     },
@@ -851,12 +851,12 @@ function exportSessionResults(session) {
       name: "Nube",
       rows: [["Palabra", "Cantidad"], ...(stats.words || []).map((word) => [word.text, word.count])]
     }] : session.type === FREE_TEXT_TYPE ? [{
-      name: "Analisis textos",
+      name: "Análisis textos",
       rows: [
         ["Resumen", stats.summary || ""],
         ["Respuestas", stats.count],
         [],
-        ["Analisis"],
+        ["Análisis"],
         ...(stats.analysis || []).map((item) => [item]),
         [],
         ["Tema representativo", "Respuestas asociadas", "Lectura"],
@@ -1043,7 +1043,7 @@ function freeTextThemes(responses) {
       key: "experience",
       label: "Experiencia y valor para el grupo",
       detail: "Los aportes resaltan el valor de la experiencia, el aprendizaje colectivo y la contribucion al grupo.",
-      keywords: ["experiencia", "grupo", "aporte", "aportes", "valor", "valioso", "aprendizaje", "participacion", "dinamica", "ejercicio"]
+      keywords: ["experiencia", "grupo", "aporte", "aportes", "valor", "valioso", "aprendizaje", "participación", "dinámica", "ejercicio"]
     },
     {
       key: "clarity",
@@ -1054,7 +1054,7 @@ function freeTextThemes(responses) {
     {
       key: "followup",
       label: "Seguimiento y compromisos",
-      detail: "Las respuestas sugieren cerrar con compromisos, responsables y continuidad para que las ideas se traduzcan en accion.",
+      detail: "Las respuestas sugieren cerrar con compromisos, responsables y continuidad para que las ideas se traduzcan en acción.",
       keywords: ["seguimiento", "compromiso", "compromisos", "responsable", "responsables", "accion", "acciones", "continuidad", "cerrar", "implementar"]
     },
     {
@@ -1084,29 +1084,29 @@ function freeTextThemes(responses) {
     key: "general",
     label: "Insumos cualitativos generales",
     count: responses.length,
-    detail: "Las respuestas entregan percepciones utiles, pero aun no forman una tendencia tematica clara."
+    detail: "Las respuestas entregan percepciones utiles, pero aún no forman una tendencia tematica clara."
   }];
 }
 
 function freeTextSummary(responses, themes) {
-  if (!responses.length) return "Aun no hay respuestas. Cuando empiecen a llegar, aqui aparecera un resumen automatico de los temas principales.";
-  if (!themes.length) return `Hay ${responses.length} respuestas registradas, pero todavia no hay un patron repetido claro. Conviene leerlas como insumos exploratorios y esperar mas participacion.`;
+  if (!responses.length) return "Aún no hay respuestas. Cuando empiecen a llegar, aquí aparecerá un resumen automático de los temas principales.";
+  if (!themes.length) return `Hay ${responses.length} respuestas registradas, pero todavía no hay un patrón repetido claro. Conviene leerlas como insumos exploratorios y esperar más participación.`;
   const themeText = themes.slice(0, 3).map((theme) => theme.label.toLowerCase()).join(", ");
   return `A partir de ${responses.length} respuestas, la lectura ejecutiva se concentra en ${themeText}.`;
 }
 
 function freeTextAnalysis(responses, themes) {
-  if (!responses.length) return ["El analisis aparecera cuando lleguen las primeras respuestas."];
-  if (!themes.length) return ["Las respuestas son variadas y aun no forman una tendencia dominante.", "Se recomienda esperar mas participacion antes de sacar conclusiones."];
+  if (!responses.length) return ["El análisis aparecerá cuando lleguen las primeras respuestas."];
+  if (!themes.length) return ["Las respuestas son variadas y aún no forman una tendencia dominante.", "Se recomienda esperar más participación antes de sacar conclusiones."];
   return themes.slice(0, 3).map((theme) => `${theme.label}: ${theme.detail}`);
 }
 
 function freeTextRecommendations(themes) {
-  if (!themes.length) return ["Recoger mas respuestas para identificar patrones con mayor confianza."];
+  if (!themes.length) return ["Recoger mas respuestas para identificar patrónes con mayor confianza."];
   return [
     `Profundizar en ${themes[0].label.toLowerCase()} con una pregunta de seguimiento.`,
-    themes[1] ? `Validar si ${themes[0].label.toLowerCase()} y ${themes[1].label.toLowerCase()} requieren una accion conjunta.` : "Identificar responsables y alcance para el tema principal.",
-    "Cerrar la conversacion con compromisos concretos y responsables visibles."
+    themes[1] ? `Validar si ${themes[0].label.toLowerCase()} y ${themes[1].label.toLowerCase()} requieren una acción conjunta.` : "Identificar responsables y alcance para el tema principal.",
+    "Cerrar la conversación con compromisos concretos y responsables visibles."
   ];
 }
 
@@ -1263,7 +1263,7 @@ function welcomeView() {
           </form>
           <form data-action="joinForm" class="code-form">
             <h2>Entrar como invitado</h2>
-            <label for="code">Entrar con codigo</label>
+            <label for="code">Entrar con código</label>
             <div class="inline-form">
               <input id="code" name="code" maxlength="4" placeholder="EPM1" autocomplete="off" />
               <button class="secondary" type="submit">Unirme</button>
@@ -1293,7 +1293,7 @@ function hostSetupView() {
       ${roomHeader({ code: "Host" })}
       <section class="host-portal">
         <form class="panel setup-panel" data-action="createSessionForm">
-          <p class="eyebrow">Crear sesion</p>
+          <p class="eyebrow">Crear sesión</p>
           <h1>${appState.surveyType === "quiz" ? "Nuevo quiz" : appState.surveyType === "wordcloud" ? "Nueva nube de palabras" : appState.surveyType === FREE_TEXT_TYPE ? "Nuevo texto libre" : appState.surveyType === DIGITAL_PROFILE_TYPE ? "Nuevo Perfil digital" : "Nueva escala"}</h1>
           <input type="hidden" name="type" value="${appState.surveyType}" />
           ${
@@ -1302,21 +1302,21 @@ function hostSetupView() {
                   <div class="quiz-builder" id="quiz-builder">
                     ${quizQuestionTemplate(0)}
                   </div>
-                  <label for="setup-duration">Tiempo maximo de vigencia en minutos</label>
+                  <label for="setup-duration">Tiempo máximo de vigencia en minutos</label>
                   <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                 </div>`
               : appState.surveyType === "wordcloud"
                 ? `<div class="scale-config">
                     <label for="setup-question">Pregunta</label>
                     <textarea id="setup-question" name="question" rows="3">Escribe una palabra o frase corta que represente esta experiencia</textarea>
-                    <label for="setup-duration">Tiempo maximo de vigencia en minutos</label>
+                    <label for="setup-duration">Tiempo máximo de vigencia en minutos</label>
                     <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                   </div>`
                 : appState.surveyType === FREE_TEXT_TYPE
                   ? `<div class="scale-config">
                     <label for="setup-question">Pregunta</label>
-                    <textarea id="setup-question" name="question" rows="3">Comparte tu opinion sobre esta experiencia</textarea>
-                    <label for="setup-duration">Tiempo maximo de vigencia en minutos</label>
+                    <textarea id="setup-question" name="question" rows="3">Comparte tu opinión sobre esta experiencia</textarea>
+                    <label for="setup-duration">Tiempo máximo de vigencia en minutos</label>
                     <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                   </div>`
                 : appState.surveyType === DIGITAL_PROFILE_TYPE
@@ -1326,7 +1326,7 @@ function hostSetupView() {
                       ${defaultDigitalProfileSurvey().questions.map((question, index) => digitalProfileQuestionTemplate(index, question)).join("")}
                     </div>
                     <button class="secondary compact-button" type="button" data-action="addDigitalProfileQuestion">Agregar pregunta</button>
-                    <label for="setup-duration">Tiempo maximo de vigencia en minutos</label>
+                    <label for="setup-duration">Tiempo máximo de vigencia en minutos</label>
                     <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                   </div>`
                   : `<div class="scale-config">
@@ -1334,17 +1334,17 @@ function hostSetupView() {
                   <textarea id="setup-question" name="question" rows="3">${defaultQuestion}</textarea>
                   <div class="setup-inline-fields">
                     <label class="field" for="setup-scale-max">
-                      <span>Numero maximo de escala</span>
+                      <span>Número máximo de escala</span>
                       <input id="setup-scale-max" name="scaleMax" type="number" min="2" max="10" value="10" />
                     </label>
                     <label class="field" for="setup-duration">
-                      <span>Tiempo maximo de vigencia en minutos</span>
+                      <span>Tiempo máximo de vigencia en minutos</span>
                       <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                     </label>
                   </div>
                 </div>`
           }
-          <button class="primary full create-session-button" type="submit">Crear sesion</button>
+          <button class="primary full create-session-button" type="submit">Crear sesión</button>
         </form>
       </section>
       ${footer()}
@@ -1373,8 +1373,8 @@ function surveyTypeChoiceView() {
         ${hostActionCard("scale", "Escala", "Votacion numerica del 1 al 10 con promedio y distribucion.", "scale")}
         ${hostActionCard("quiz", "Quiz", "Preguntas con respuestas correctas, puntos y puntaje final.", "quiz")}
         ${hostActionCard("wordcloud", "Nube de palabras", "Respuestas abiertas que forman una figura según frecuencia.", "wordcloud")}
-        ${hostActionCard(FREE_TEXT_TYPE, "Texto libre", "Preguntas abiertas con resumen y analisis de respuestas.", "text")}
-        ${hostActionCard(DIGITAL_PROFILE_TYPE, "Perfil digital", "Clasifica canales tradicionales, hibridos, digitales y muy digitales.", "digitalprofile")}
+        ${hostActionCard(FREE_TEXT_TYPE, "Texto libre", "Preguntas abiertas con resumen y análisis de respuestas.", "text")}
+        ${hostActionCard(DIGITAL_PROFILE_TYPE, "Perfil digital", "Clasifica canales tradicionales, híbridos, digitales y muy digitales.", "digitalprofile")}
       </section>
       ${footer()}
     </main>
@@ -1634,8 +1634,9 @@ function waitingView(session) {
           return `<button class="vote-tile ${voted && session.votes[appState.user.id].value === value ? "selected" : ""}" data-vote="${value}" ${locked ? "disabled" : ""}>${value}</button>`;
         }).join("")}
       </section>
-      <section class="panel compact">
-        <strong>${closed ? "La votacion ya no acepta respuestas" : voted ? "Tu voto quedo registrado" : "Selecciona un valor de 1 a 10"}</strong>
+      <section class="panel compact ${voted ? "thank-you-panel" : ""}">
+        <strong>${closed ? "La votación ya no acepta respuestas" : voted ? "Gracias por tu respuesta" : "Selecciona un valor de 1 a 10"}</strong>
+        ${voted ? `<p>Tu aporte quedó registrado correctamente.</p>` : ""}
         <div class="mini-result">
           ${thermometer(stats.average)}
           ${histogram(stats)}
@@ -1661,7 +1662,7 @@ function wordCloudParticipantView(session) {
       </section>
       ${
         voted
-          ? `<section class="panel compact"><strong>Tu respuesta quedó registrada</strong><p>${escapeHtml(vote.answers?.text || "")}</p></section>`
+          ? `<section class="panel compact thank-you-panel"><strong>Gracias por tu respuesta</strong><p>Tu aporte quedó registrado correctamente.</p></section>`
           : `<form class="panel wordcloud-form" data-action="wordCloudSubmitForm">
               <label for="wordcloud-answer">Tu palabra o frase corta</label>
               <input id="wordcloud-answer" name="wordcloudAnswer" maxlength="80" placeholder="Ej: social media" value="${escapeHtml(draft)}" ${closed ? "disabled" : ""} />
@@ -1687,10 +1688,10 @@ function freeTextParticipantView(session) {
       </section>
       ${
         voted
-          ? `<section class="panel compact thank-you-panel"><strong>Gracias por tu respuesta</strong><p>Tu aporte quedo registrado correctamente.</p></section>`
+          ? `<section class="panel compact thank-you-panel"><strong>Gracias por tu respuesta</strong><p>Tu aporte quedó registrado correctamente.</p></section>`
           : `<form class="panel free-text-form" data-action="freeTextSubmitForm">
               <label for="free-text-answer">Tu respuesta</label>
-              <textarea id="free-text-answer" name="freeTextAnswer" rows="7" maxlength="1200" placeholder="Escribe aqui tu respuesta" ${closed ? "disabled" : ""}>${escapeHtml(draft)}</textarea>
+              <textarea id="free-text-answer" name="freeTextAnswer" rows="7" maxlength="1200" placeholder="Escribe aquí tu respuesta" ${closed ? "disabled" : ""}>${escapeHtml(draft)}</textarea>
               <button class="primary full" type="submit" ${closed ? "disabled" : ""}>Enviar respuesta</button>
             </form>`
       }
@@ -1711,7 +1712,7 @@ function quizParticipantViewLegacy(session) {
       <section class="panel question-panel">
         <p class="eyebrow">Quiz · ${closed ? "Cerrado" : `Tiempo restante ${formatRemaining(session)}`}</p>
         <h1>${escapeHtml(session.question)}</h1>
-        <p>${session.quiz?.questions?.length || 0} preguntas · puntaje maximo ${maxQuizScore(session)}</p>
+        <p>${session.quiz?.questions?.length || 0} preguntas · puntaje máximo ${maxQuizScore(session)}</p>
       </section>
       ${
         voted
@@ -1754,6 +1755,7 @@ function quizParticipantView(session) {
         voted
           ? `<section class="panel score-panel">
               <div class="score-mood" aria-hidden="true">${mood.icon}</div>
+              <strong>Gracias por tu respuesta</strong>
               <p class="eyebrow">${mood.label}</p>
               <h1>${vote.score}</h1>
               <p>Sobre ${maxScore} puntos posibles</p>
@@ -1842,6 +1844,7 @@ function digitalProfileResultCard(result, user) {
         <span class="result-avatar" title="${escapeHtml(avatarLabel)}">${avatarIcon}</span>
         <strong>${escapeHtml(user?.name || "Participante")}</strong>
       </div>
+      <p class="eyebrow">Gracias por tu respuesta</p>
       <p class="eyebrow">${escapeHtml(result.profile.tone)}</p>
       <h1>${escapeHtml(result.profile.label)}</h1>
       <div class="annual-value">
@@ -1929,7 +1932,7 @@ function resultsSidePanel(session) {
         <div class="quiz-summary">
           <strong>${stats.count}</strong><span>participantes</span>
           <strong>${stats.average.toFixed(1)}</strong><span>promedio puntos</span>
-          <strong>${stats.maxScore}</strong><span>puntos maximos</span>
+          <strong>${stats.maxScore}</strong><span>puntos máximos</span>
         </div>
       </div>
     `;
@@ -1948,13 +1951,13 @@ function resultsSidePanel(session) {
 function freeTextResultsPanel(stats) {
   return `
     <div class="panel results-side free-text-results-side">
-      <h2 class="free-text-title">Analisis de textos</h2>
+      <h2 class="free-text-title">Análisis de textos</h2>
       <div class="free-text-analysis">
         <strong>Resumen ejecutivo</strong>
         <p>${escapeHtml(stats.summary)}</p>
       </div>
       <div class="free-text-insights">
-        <strong>Analisis</strong>
+        <strong>Análisis</strong>
         ${
           stats.analysis?.length
             ? `<ul>${stats.analysis.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
@@ -1976,7 +1979,7 @@ function freeTextResultsPanel(stats) {
         ${
           stats.recommendations?.length
             ? `<ul>${stats.recommendations.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
-            : `<p class="muted">Aun no hay textos para analizar.</p>`
+            : `<p class="muted">Aún no hay textos para analizar.</p>`
         }
       </div>
     </div>
@@ -2035,7 +2038,7 @@ function digitalProfileAnalysis(stats) {
 }
 
 function digitalProfileAverageAnalysis(stats) {
-  if (!stats.count) return "El analisis aparecera cuando lleguen las primeras respuestas.";
+  if (!stats.count) return "El análisis aparecerá cuando lleguen las primeras respuestas.";
   const digitalCount = (stats.profileCounts?.digital || 0) + (stats.profileCounts?.["very-digital"] || 0);
   const digitalShare = Math.round((digitalCount / stats.count) * 100);
   const traditionalShare = Math.round(((stats.profileCounts?.traditional || 0) / stats.count) * 100);
@@ -2203,12 +2206,12 @@ function inviteView(session) {
         <img class="invite-logo" src="./assets/logo-grupo-epm.png" alt="Grupo EPM" />
         <p class="invite-vp">Vicepresidencia Experiencia Usuario Cliente</p>
         <h1>Participa en Retox</h1>
-        <p class="invite-copy">Te invitamos a responder esta encuesta en vivo. Escanea el codigo QR o ingresa con el codigo de sala.</p>
+        <p class="invite-copy">Te invitamos a responder esta encuesta en vivo. Escanea el código QR o ingresa con el código de sala.</p>
         <strong class="invite-code">${session.code}</strong>
         <img class="invite-qr" src="${qrUrl(links.participant, 280)}" alt="QR para participar en Retox" />
         <p class="invite-question">${escapeHtml(session.question)}</p>
         <div class="invite-actions">
-          <a class="top-control" href="${links.participant}">Ir a la votacion</a>
+          <a class="top-control" href="${links.participant}">Ir a la votación</a>
           <button class="top-control" data-action="home">Inicio</button>
         </div>
         <p class="invite-signature">Firma: Vicepresidencia Experiencia Usuario Cliente - Grupo EPM</p>
@@ -2243,7 +2246,7 @@ function liveResultsPanel(session) {
             <h1>${session.type === "wordcloud" || session.type === FREE_TEXT_TYPE ? stats.count : isDigitalProfile ? (stats.count ? formatCop(stats.average) : "--") : stats.count ? stats.average.toFixed(1) : "--"}</h1>
             <p>${stats.count} respuestas de ${Object.keys(session.participants).length} participantes</p>
           </div>
-          ${isDigitalProfile ? `<div class="digital-average-analysis"><strong>Analisis</strong><p>${escapeHtml(digitalProfileAverageAnalysis(stats))}</p></div>` : ""}
+          ${isDigitalProfile ? `<div class="digital-average-analysis"><strong>Análisis</strong><p>${escapeHtml(digitalProfileAverageAnalysis(stats))}</p></div>` : ""}
           ${session.type === "quiz" || session.type === "wordcloud" || session.type === FREE_TEXT_TYPE || isDigitalProfile ? "" : thermometer(stats.average, true)}
         </div>
       </div>
@@ -2251,7 +2254,7 @@ function liveResultsPanel(session) {
         ${
           people.length
             ? people.map((person) => isDigitalProfile ? digitalProfilePersonChip(session, person) : personChip(person)).join("")
-            : `<p class="waiting-votes">Aun no hay votos registrados</p>`
+            : `<p class="waiting-votes">Aún no hay votos registrados</p>`
         }
       </div>
     </div>
@@ -2341,34 +2344,6 @@ function escapeHtml(value) {
     '"': "&quot;",
     "'": "&#039;"
   })[char]);
-}
-
-function repairEncoding(value) {
-  return String(value ?? "")
-    .replaceAll("ÃƒÂ¡", "á")
-    .replaceAll("ÃƒÂ©", "é")
-    .replaceAll("ÃƒÂ­", "í")
-    .replaceAll("ÃƒÂ³", "ó")
-    .replaceAll("ÃƒÂº", "ú")
-    .replaceAll("ÃƒÂ±", "ñ")
-    .replaceAll("Ã‚Â·", "-")
-    .replaceAll("Ã¡", "á")
-    .replaceAll("Ã©", "é")
-    .replaceAll("Ã­", "í")
-    .replaceAll("Ã³", "ó")
-    .replaceAll("Ãº", "ú")
-    .replaceAll("Ã±", "ñ")
-    .replaceAll("Ã", "Á")
-    .replaceAll("Ã‰", "É")
-    .replaceAll("Ã", "Í")
-    .replaceAll("Ã“", "Ó")
-    .replaceAll("Ãš", "Ú")
-    .replaceAll("Ã‘", "Ñ")
-    .replaceAll("Ã¼", "ü")
-    .replaceAll("Â·", "-")
-    .replaceAll("Â¿", "¿")
-    .replaceAll("Â¡", "¡")
-    .replaceAll("Â", "");
 }
 
 function repairTextEncoding(value) {
@@ -2559,6 +2534,14 @@ function repairRenderedEncoding(root = document.body) {
     const fixed = repairTextEncoding(field.value);
     if (field.value !== fixed) field.value = fixed;
   });
+  root.querySelectorAll("[placeholder], [title], [aria-label], [value]").forEach((node) => {
+    ["placeholder", "title", "aria-label", "value"].forEach((attr) => {
+      if (!node.hasAttribute(attr)) return;
+      const current = node.getAttribute(attr);
+      const fixed = repairTextEncoding(current);
+      if (current !== fixed) node.setAttribute(attr, fixed);
+    });
+  });
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
@@ -2743,13 +2726,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v61")) return;
-    sessionStorage.setItem("retox.swReloaded.v61", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v62")) return;
+    sessionStorage.setItem("retox.swReloaded.v62", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=61", { updateViaCache: "none" })
+    .register("./sw.js?v=62", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })
