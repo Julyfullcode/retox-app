@@ -989,15 +989,51 @@ function computeMultipleChoiceStats(session) {
   const count = votes.length;
   const maxCount = Math.max(0, ...distribution);
   const leaders = options.filter((_, index) => distribution[index] === maxCount && maxCount > 0);
-  let summary = "Aún no hay respuestas para resumir.";
-  if (leaders.length === 1) {
-    const index = options.indexOf(leaders[0]);
-    const percent = Math.round((distribution[index] / count) * 100);
-    summary = `La opción más seleccionada es “${leaders[0]}”, con ${distribution[index]} ${distribution[index] === 1 ? "respuesta" : "respuestas"} (${percent}%).`;
-  } else if (leaders.length > 1) {
-    summary = `Hay un empate entre ${leaders.map((option) => `“${option}”`).join(", ")}, con ${maxCount} respuestas cada una.`;
-  }
+  const summary = multipleChoiceAnalysis(session, options, distribution, count, leaders, maxCount);
   return { average: count, count, distribution, max: Math.max(1, maxCount), options, summary };
+}
+
+function multipleChoiceAnalysis(session, options, distribution, count, leaders, maxCount) {
+  if (!count) return "Aún no hay respuestas para analizar.";
+  const ranked = options
+    .map((option, index) => ({ option, count: distribution[index] || 0 }))
+    .filter((item) => item.count > 0)
+    .sort((a, b) => b.count - a.count);
+  const leaderPercent = Math.round((maxCount / count) * 100);
+  let reading = leaders.length === 1
+    ? `Predomina “${leaders[0]}” (${leaderPercent}%). ${leaderPercent >= 70 ? "Esto muestra una percepción claramente compartida por el grupo." : "Hay una tendencia principal, aunque convive con otras percepciones."}`
+    : `Las respuestas se dividen entre ${leaders.map((option) => `“${option}”`).join(" y ")}. No hay una postura dominante y el grupo expresa percepciones diferentes.`;
+
+  const context = normalizeForAnalysis(`${session?.question || ""} ${options.join(" ")}`);
+  if (/energia|animo|actitud|disposicion|como llegas/.test(context)) {
+    const energyGroups = { low: 0, middle: 0, high: 0 };
+    options.forEach((option, index) => {
+      const text = normalizeForAnalysis(option);
+      const optionCount = distribution[index] || 0;
+      if (/cafe|cansad|agotad|sueno|urgente|baja energia|sin energia/.test(text)) energyGroups.low += optionCount;
+      else if (/ritmo|normal|medio|moderad|tranquil/.test(text)) energyGroups.middle += optionCount;
+      else if (/buena disposicion|mucha energia|listo|aportar|construir|motivad|entusiasm|alta energia/.test(text)) energyGroups.high += optionCount;
+    });
+    if (energyGroups.low > 0 && energyGroups.middle > 0 && energyGroups.high === 0) {
+      reading += " En conjunto, el grupo se encuentra entre una energía baja y una activación gradual: algunas personas necesitan recuperar energía y otras apenas están entrando en ritmo. Todavía no se evidencia una disposición alta para iniciar.";
+    } else if (energyGroups.high >= Math.max(energyGroups.low, energyGroups.middle) && energyGroups.high > 0) {
+      reading += " En conjunto, se percibe una energía favorable y disposición para participar, aportar y construir.";
+    } else if (energyGroups.low >= Math.max(energyGroups.middle, energyGroups.high) && energyGroups.low > 0) {
+      reading += " En conjunto, predomina una energía baja; puede ser útil comenzar con una activación breve antes de entrar en los temas centrales.";
+    } else if (energyGroups.middle > 0) {
+      reading += " En conjunto, el grupo está entrando gradualmente en ritmo y aún puede aumentar su nivel de activación.";
+    }
+  } else if (ranked.length > 1) {
+    reading += ` La segunda percepción con mayor presencia es “${ranked[1].option}”, lo que conviene considerar junto con la tendencia principal.`;
+  }
+
+  const unanswered = options.filter((_, index) => !distribution[index]);
+  if (unanswered.length && unanswered.length <= 2) reading += ` No hubo respuestas para ${unanswered.map((option) => `“${option}”`).join(" ni ")}.`;
+  return reading;
+}
+
+function normalizeForAnalysis(value) {
+  return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 function scoreQuiz(session, answers) {
@@ -1983,7 +2019,7 @@ function hostView(session) {
     <main class="host-layout">
       ${roomHeader(session)}
       <section class="host-main">
-        <div class="results-row ${session.type === "wordcloud" ? "wordcloud-results-row" : session.type === FREE_TEXT_TYPE ? "free-text-results-row" : ""}">
+        <div class="results-row ${session.type === "wordcloud" ? "wordcloud-results-row" : session.type === FREE_TEXT_TYPE ? "free-text-results-row" : session.type === MULTIPLE_CHOICE_TYPE ? "multiple-choice-results-row" : ""}">
           ${liveResultsPanel(session)}
           ${resultsSidePanel(session)}
         </div>
@@ -2306,7 +2342,7 @@ function displayView(session) {
     <main class="display-layout">
       ${roomHeader(session)}
       <section class="display-results">
-        <div class="results-row ${session.type === "wordcloud" ? "wordcloud-results-row" : session.type === FREE_TEXT_TYPE ? "free-text-results-row" : ""}">
+        <div class="results-row ${session.type === "wordcloud" ? "wordcloud-results-row" : session.type === FREE_TEXT_TYPE ? "free-text-results-row" : session.type === MULTIPLE_CHOICE_TYPE ? "multiple-choice-results-row" : ""}">
           ${liveResultsPanel(session)}
           ${resultsSidePanel(session)}
         </div>
@@ -2854,13 +2890,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v68")) return;
-    sessionStorage.setItem("retox.swReloaded.v68", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v69")) return;
+    sessionStorage.setItem("retox.swReloaded.v69", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=68", { updateViaCache: "none" })
+    .register("./sw.js?v=69", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })

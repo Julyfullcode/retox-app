@@ -1350,6 +1350,10 @@ fieldset {
   grid-template-columns: minmax(250px, 0.46fr) minmax(640px, 1.54fr);
 }
 
+.multiple-choice-results-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .host-main,
 .host-side {
   display: grid;
@@ -1879,7 +1883,7 @@ footer {
 .choice-track { height: 14px; overflow: hidden; border-radius: 999px; background: rgba(102, 86, 155, .14); }
 .choice-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #7257d9, #35a878); transition: width .35s ease; }
 .choice-summary { margin-top: 24px; padding: 18px; border-radius: 16px; background: rgba(114, 87, 217, .1); }
-.choice-summary p { margin: 8px 0 0; line-height: 1.5; }
+.choice-summary p { margin: 8px 0 0; line-height: 1.55; }
 .multiple-choice-answers .answer-option { cursor: pointer; }
 
 .back-button {
