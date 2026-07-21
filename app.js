@@ -2890,13 +2890,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v70")) return;
-    sessionStorage.setItem("retox.swReloaded.v70", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v71")) return;
+    sessionStorage.setItem("retox.swReloaded.v71", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=70", { updateViaCache: "none" })
+    .register("./sw.js?v=71", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })
