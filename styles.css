@@ -1354,6 +1354,31 @@ fieldset {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.multiple-choice-stage {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.multiple-choice-stage .live-question {
+  align-self: start;
+  width: 100%;
+  padding-top: clamp(22px, 4vh, 52px);
+}
+
+.multiple-choice-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-self: center;
+}
+
+.multiple-choice-metrics .metric-card {
+  min-width: 0;
+  height: 100%;
+}
+
+.multiple-choice-stage .live-voters {
+  align-self: end;
+}
+
 .host-main,
 .host-side {
   display: grid;
@@ -2083,6 +2108,10 @@ footer {
     grid-template-columns: 1fr;
     justify-items: center;
     min-height: 264px;
+  }
+
+  .multiple-choice-metrics {
+    grid-template-columns: 1fr;
   }
 
   .live-metrics,

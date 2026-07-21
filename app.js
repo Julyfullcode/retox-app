@@ -2381,9 +2381,9 @@ function liveResultsPanel(session) {
   const people = isDigitalProfile ? votedPeople(session) : votedPeople(session).slice(-5);
   const links = sessionLinks(session.code);
   return `
-    <div class="results-stage ${session.type === "wordcloud" ? "wordcloud-stage" : session.type === FREE_TEXT_TYPE ? "free-text-stage" : ""}">
+    <div class="results-stage ${session.type === "wordcloud" ? "wordcloud-stage" : session.type === FREE_TEXT_TYPE ? "free-text-stage" : session.type === MULTIPLE_CHOICE_TYPE ? "multiple-choice-stage" : ""}">
       <h2 class="live-question">${escapeHtml(session.question)}</h2>
-      <div class="live-metrics ${session.type === "wordcloud" ? "wordcloud-metrics" : session.type === FREE_TEXT_TYPE ? "free-text-metrics" : ""}">
+      <div class="live-metrics ${session.type === "wordcloud" ? "wordcloud-metrics" : session.type === FREE_TEXT_TYPE ? "free-text-metrics" : session.type === MULTIPLE_CHOICE_TYPE ? "multiple-choice-metrics" : ""}">
         <div class="metric-card countdown ${isSessionClosed(session) ? "closed" : ""}">
           <span>${isSessionClosed(session) ? "Votacion cerrada" : "Tiempo restante"}</span>
           <strong>${formatRemaining(session)}</strong>
@@ -2890,13 +2890,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v69")) return;
-    sessionStorage.setItem("retox.swReloaded.v69", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v70")) return;
+    sessionStorage.setItem("retox.swReloaded.v70", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=69", { updateViaCache: "none" })
+    .register("./sw.js?v=70", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })
