@@ -87,7 +87,8 @@ let appState = {
   surveyType: "scale",
   digitalProfileDraft: {},
   wordCloudDraft: {},
-  freeTextDraft: {}
+  freeTextDraft: {},
+  multipleChoiceDraft: {}
 };
 
 function uid() {
@@ -726,6 +727,10 @@ async function submitMultipleChoice(event) {
   const optionIndex = Number(selected);
   if (!Number.isInteger(optionIndex) || !current.multipleChoice?.options?.[optionIndex]) return;
   const saved = await saveMultipleChoiceVote(appState.code, appState.user, optionIndex, current.round);
+  if (saved) {
+    const { [appState.code]: _sentDraft, ...rest } = appState.multipleChoiceDraft || {};
+    appState.multipleChoiceDraft = rest;
+  }
   toast(saved ? "Respuesta enviada." : "Tu respuesta ya fue enviada.");
   render();
 }
@@ -1736,7 +1741,8 @@ function multipleChoiceParticipantView(session) {
   const closed = isSessionClosed(session);
   const options = session.multipleChoice?.options || [];
   const selectedText = options[Number(session.votes[appState.user?.id]?.answers?.optionIndex)] || "";
-  return `<main class="app-grid">${roomHeader(session)}<section class="panel question-panel"><p class="eyebrow">Opción múltiple · ${closed ? "Cerrada" : `Tiempo restante ${formatRemaining(session)}`}</p><h1>${escapeHtml(session.question)}</h1><p>${Object.keys(session.votes || {}).length} respuestas recibidas</p></section>${voted ? `<section class="panel compact thank-you-panel">${thankYouContent(selectedText)}</section>` : `<form class="panel quiz-answer-form" data-action="multipleChoiceSubmitForm"><fieldset class="quiz-answer-question multiple-choice-answers"><legend>Selecciona una respuesta</legend>${options.map((option, index) => `<label class="answer-option"><input type="radio" name="multipleChoiceAnswer" value="${index}" ${closed ? "disabled" : ""} required /><span>${escapeHtml(option)}</span></label>`).join("")}</fieldset><button class="primary full" type="submit" ${closed ? "disabled" : ""}>Enviar respuesta</button></form>`}${footer()}</main>`;
+  const draft = appState.multipleChoiceDraft?.[session.code];
+  return `<main class="app-grid">${roomHeader(session)}<section class="panel question-panel"><p class="eyebrow">Opción múltiple · ${closed ? "Cerrada" : `Tiempo restante ${formatRemaining(session)}`}</p><h1>${escapeHtml(session.question)}</h1><p>${Object.keys(session.votes || {}).length} respuestas recibidas</p></section>${voted ? `<section class="panel compact thank-you-panel">${thankYouContent(selectedText)}</section>` : `<form class="panel quiz-answer-form" data-action="multipleChoiceSubmitForm"><fieldset class="quiz-answer-question multiple-choice-answers"><legend>Selecciona una respuesta</legend>${options.map((option, index) => `<label class="answer-option"><input type="radio" name="multipleChoiceAnswer" value="${index}" ${Number(draft) === index ? "checked" : ""} ${closed ? "disabled" : ""} required /><span>${escapeHtml(option)}</span></label>`).join("")}</fieldset><button class="primary full" type="submit" ${closed ? "disabled" : ""}>Enviar respuesta</button></form>`}${footer()}</main>`;
 }
 
 function wordCloudParticipantView(session) {
@@ -2702,7 +2708,7 @@ document.addEventListener("click", async (event) => {
     render();
   }
   if (action === "home") {
-    appState = { ...appState, view: "welcome", code: "", hostMode: false, hostSection: "menu", digitalProfileDraft: {}, wordCloudDraft: {}, freeTextDraft: {} };
+    appState = { ...appState, view: "welcome", code: "", hostMode: false, hostSection: "menu", digitalProfileDraft: {}, wordCloudDraft: {}, freeTextDraft: {}, multipleChoiceDraft: {} };
     history.replaceState(null, "", appBaseUrl());
     render();
   }
@@ -2774,6 +2780,12 @@ document.addEventListener("submit", async (event) => {
 });
 
 document.addEventListener("change", (event) => {
+  if (event.target.name === "multipleChoiceAnswer") {
+    appState.multipleChoiceDraft = {
+      ...(appState.multipleChoiceDraft || {}),
+      [appState.code]: Number(event.target.value)
+    };
+  }
   if (event.target.name?.startsWith("dp-")) {
     const qIndex = event.target.name.split("-")[1];
     appState.digitalProfileDraft = {
@@ -2842,13 +2854,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v67")) return;
-    sessionStorage.setItem("retox.swReloaded.v67", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v68")) return;
+    sessionStorage.setItem("retox.swReloaded.v68", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=67", { updateViaCache: "none" })
+    .register("./sw.js?v=68", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })
@@ -2868,13 +2880,16 @@ setInterval(async () => {
   const focused = document.activeElement;
   const isEditing = focused && ["INPUT", "TEXTAREA", "SELECT"].includes(focused.tagName);
   const shouldSync = appState.code && ["host", "display"].includes(appState.view);
+  if (!isEditing && ["host", "waiting", "display"].includes(appState.view)) render();
   if (shouldSync && !remotePollInFlight) {
     remotePollInFlight = true;
     try {
       await fetchRemoteSession(appState.code);
+      if (["host", "display"].includes(appState.view)) render();
+    } catch (error) {
+      console.warn("No pude actualizar los resultados en este ciclo:", error);
     } finally {
       remotePollInFlight = false;
     }
   }
-  if (!isEditing && ["host", "waiting", "display"].includes(appState.view)) render();
 }, 1200);
