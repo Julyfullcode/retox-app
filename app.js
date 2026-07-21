@@ -2383,7 +2383,7 @@ function liveResultsPanel(session) {
   return `
     <div class="results-stage ${session.type === "wordcloud" ? "wordcloud-stage" : session.type === FREE_TEXT_TYPE ? "free-text-stage" : session.type === MULTIPLE_CHOICE_TYPE ? "multiple-choice-stage" : ""}">
       <h2 class="live-question">${escapeHtml(session.question)}</h2>
-      <div class="live-metrics ${session.type === "wordcloud" ? "wordcloud-metrics" : session.type === FREE_TEXT_TYPE ? "free-text-metrics" : session.type === MULTIPLE_CHOICE_TYPE ? "multiple-choice-metrics" : ""}">
+      ${session.type === MULTIPLE_CHOICE_TYPE ? multipleChoiceLiveMetrics(session, stats, links) : `<div class="live-metrics ${session.type === "wordcloud" ? "wordcloud-metrics" : session.type === FREE_TEXT_TYPE ? "free-text-metrics" : ""}">
         <div class="metric-card countdown ${isSessionClosed(session) ? "closed" : ""}">
           <span>${isSessionClosed(session) ? "Votacion cerrada" : "Tiempo restante"}</span>
           <strong>${formatRemaining(session)}</strong>
@@ -2403,7 +2403,7 @@ function liveResultsPanel(session) {
           ${isDigitalProfile ? `<div class="digital-average-analysis"><strong>Análisis</strong><p>${escapeHtml(digitalProfileAverageAnalysis(stats))}</p></div>` : ""}
           ${session.type === "quiz" || session.type === "wordcloud" || session.type === FREE_TEXT_TYPE || session.type === MULTIPLE_CHOICE_TYPE || isDigitalProfile ? "" : thermometer(stats.average, true)}
         </div>
-      </div>
+      </div>`}
       <div class="live-voters ${isDigitalProfile ? "digital-live-voters" : ""}" aria-live="polite">
         ${
           people.length
@@ -2413,6 +2413,26 @@ function liveResultsPanel(session) {
       </div>
     </div>
   `;
+}
+
+function multipleChoiceLiveMetrics(session, stats, links) {
+  const closed = isSessionClosed(session);
+  return `
+    <div class="multiple-choice-overview ${closed ? "closed" : ""}">
+      <div class="choice-overview-time">
+        <span>${closed ? "Votación cerrada" : "Tiempo restante"}</span>
+        <strong>${formatRemaining(session)}</strong>
+      </div>
+      <a class="choice-overview-qr" href="${links.invite}" target="_blank" rel="noreferrer" aria-label="Abrir invitación con QR">
+        <img src="${qrUrl(links.participant, 112)}" alt="QR para ingresar a la encuesta" />
+        <small>Escanea para participar</small>
+      </a>
+      <div class="choice-overview-responses">
+        <span>Respuestas</span>
+        <strong>${stats.count}</strong>
+        <small>${stats.count} respuestas de ${Object.keys(session.participants).length} participantes</small>
+      </div>
+    </div>`;
 }
 
 function roomHeader(session) {
@@ -2890,13 +2910,13 @@ async function clearBrowserCaches() {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (sessionStorage.getItem("retox.swReloaded.v71")) return;
-    sessionStorage.setItem("retox.swReloaded.v71", "1");
+    if (sessionStorage.getItem("retox.swReloaded.v72")) return;
+    sessionStorage.setItem("retox.swReloaded.v72", "1");
     location.reload();
   });
 
   navigator.serviceWorker
-    .register("./sw.js?v=71", { updateViaCache: "none" })
+    .register("./sw.js?v=72", { updateViaCache: "none" })
     .then((registration) => {
       registration.update().catch(() => {});
     })
