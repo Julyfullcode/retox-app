@@ -41,6 +41,7 @@ const sampleNames = ["Ana", "Luis", "Mafe", "Carlos", "Sofi", "Juli", "Diana", "
 const defaultQuestion = "Del 1 al 10, ¿cómo calificas esta experiencia?";
 const DIGITAL_PROFILE_TYPE = "digitalprofile";
 const FREE_TEXT_TYPE = "freetext";
+const MULTIPLE_CHOICE_TYPE = "multiplechoice";
 const digitalProfileSurvey = {
   title: "Perfil digital",
   questions: [
@@ -363,6 +364,10 @@ async function saveFreeTextVote(code, user, text, round) {
   return saveVoteRow(code, user, { type: FREE_TEXT_TYPE, answers: { text }, round });
 }
 
+async function saveMultipleChoiceVote(code, user, optionIndex, round) {
+  return saveVoteRow(code, user, { type: MULTIPLE_CHOICE_TYPE, answers: { optionIndex }, round });
+}
+
 async function saveDigitalProfileVote(code, user, answers, score, round) {
   return saveVoteRow(code, user, { type: DIGITAL_PROFILE_TYPE, answers, score, round });
 }
@@ -520,7 +525,7 @@ async function createSession(options = {}) {
   const code = sessionCode();
   const now = Date.now();
   const durationMinutes = Math.max(1, Number(options.durationMinutes || 10));
-  const type = ["quiz", "wordcloud", FREE_TEXT_TYPE, DIGITAL_PROFILE_TYPE].includes(options.type) ? options.type : "scale";
+  const type = ["quiz", "wordcloud", FREE_TEXT_TYPE, DIGITAL_PROFILE_TYPE, MULTIPLE_CHOICE_TYPE].includes(options.type) ? options.type : "scale";
   const session = {
     code,
     createdAt: now,
@@ -531,6 +536,7 @@ async function createSession(options = {}) {
     digitalProfile: type === DIGITAL_PROFILE_TYPE ? { title: digitalProfileSurvey.title, questions: options.digitalProfileQuestions || defaultDigitalProfileSurvey().questions } : null,
     wordCloud: type === "wordcloud" ? { maxWords: 3 } : null,
     freeText: type === FREE_TEXT_TYPE ? { analysis: true } : null,
+    multipleChoice: type === MULTIPLE_CHOICE_TYPE ? { options: options.multipleChoiceOptions || [] } : null,
     durationMinutes,
     expiresAt: now + durationMinutes * 60 * 1000,
     participants: {},
@@ -709,6 +715,21 @@ async function submitDigitalProfile(event) {
   render();
 }
 
+async function submitMultipleChoice(event) {
+  event.preventDefault();
+  if (!appState.user) return;
+  const current = await fetchSessionConfig(appState.code) || getSession(appState.code);
+  if (isSessionClosed(current)) { toast("La encuesta ya está cerrada."); render(); return; }
+  if (current.votes?.[appState.user.id]) { toast("Tu respuesta ya fue enviada."); render(); return; }
+  const selected = new FormData(event.target).get("multipleChoiceAnswer");
+  if (selected === null) { toast("Selecciona una opción."); return; }
+  const optionIndex = Number(selected);
+  if (!Number.isInteger(optionIndex) || !current.multipleChoice?.options?.[optionIndex]) return;
+  const saved = await saveMultipleChoiceVote(appState.code, appState.user, optionIndex, current.round);
+  toast(saved ? "Respuesta enviada." : "Tu respuesta ya fue enviada.");
+  render();
+}
+
 async function resetVotes() {
   await upsertSession(appState.code, (session) => {
     const stats = computeStats(session);
@@ -762,6 +783,8 @@ async function addDemoVotes() {
         const answers = samples[index % samples.length];
         const result = digitalProfileResult(session, answers);
         await saveDigitalProfileVote(appState.code, user, { ...answers, estimatedValue: result.estimatedValue, profile: result.profile.key }, result.estimatedValue, session.round);
+      } else if (session.type === MULTIPLE_CHOICE_TYPE) {
+        await saveMultipleChoiceVote(appState.code, user, index % (session.multipleChoice?.options?.length || 1), session.round);
       } else {
         await saveScaleVote(appState.code, user, Math.ceil(Math.random() * Number(session.scaleMax || 10)), session.round);
       }
@@ -811,7 +834,7 @@ function exportSessionResults(session) {
     return [
       participant.name,
       avatar[1],
-      session.type === "quiz" ? vote?.score ?? "" : session.type === DIGITAL_PROFILE_TYPE ? digitalResult?.estimatedValue ?? "" : vote?.value ?? "",
+      session.type === "quiz" ? vote?.score ?? "" : session.type === DIGITAL_PROFILE_TYPE ? digitalResult?.estimatedValue ?? "" : session.type === MULTIPLE_CHOICE_TYPE ? session.multipleChoice?.options?.[Number(vote?.answers?.optionIndex)] ?? "" : vote?.value ?? "",
       session.type === "wordcloud" || session.type === FREE_TEXT_TYPE ? vote?.answers?.text ?? "" : "",
       digitalResult?.profile.label || "",
       vote?.at ? new Date(vote.at).toLocaleString("es-CO") : "",
@@ -830,12 +853,12 @@ function exportSessionResults(session) {
         ["Codigo", session.code],
         ["Tipo", surveyTypeLabel(session.type)],
         ["Pregunta", session.question],
-        [session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" || session.type === FREE_TEXT_TYPE ? "Respuestas" : session.type === DIGITAL_PROFILE_TYPE ? "Valor promedio" : "Promedio", stats.count ? stats.average.toFixed(2) : ""],
+        [session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" || session.type === FREE_TEXT_TYPE || session.type === MULTIPLE_CHOICE_TYPE ? "Respuestas" : session.type === DIGITAL_PROFILE_TYPE ? "Valor promedio" : "Promedio", session.type === MULTIPLE_CHOICE_TYPE ? stats.count : stats.count ? stats.average.toFixed(2) : ""],
         ["Participantes", participants.length],
         ["Respuestas", stats.count],
         ...(session.type === "quiz" ? [["Puntaje máximo", stats.maxScore]] : []),
         [],
-        ["Nombre", "Avatar", session.type === "quiz" ? "Puntaje" : session.type === DIGITAL_PROFILE_TYPE ? "Valor estimado" : "Voto", session.type === FREE_TEXT_TYPE ? "Texto libre" : "Texto nube", "Perfil digital", "Fecha respuesta", "Pregunta", "Código sesión", "Ronda"],
+        ["Nombre", "Avatar", session.type === "quiz" ? "Puntaje" : session.type === DIGITAL_PROFILE_TYPE ? "Valor estimado" : session.type === MULTIPLE_CHOICE_TYPE ? "Opción elegida" : "Voto", session.type === FREE_TEXT_TYPE ? "Texto libre" : "Texto nube", "Perfil digital", "Fecha respuesta", "Pregunta", "Código sesión", "Ronda"],
         ...rows
       ]
     },
@@ -865,6 +888,9 @@ function exportSessionResults(session) {
         ["Acciones sugeridas"],
         ...(stats.recommendations || []).map((item) => [item])
       ]
+    }] : session.type === MULTIPLE_CHOICE_TYPE ? [{
+      name: "Opciones",
+      rows: [["Opción", "Cantidad", "Porcentaje"], ...stats.options.map((option, index) => [option, stats.distribution[index], stats.count ? `${Math.round(stats.distribution[index] / stats.count * 100)}%` : "0%"]), [], ["Resumen", stats.summary]]
     }] : session.type === DIGITAL_PROFILE_TYPE ? [{
       name: "Perfil digital",
       rows: [
@@ -908,6 +934,7 @@ function surveyTypeLabel(type) {
   if (type === "wordcloud") return "Nube de palabras";
   if (type === FREE_TEXT_TYPE) return "Texto libre";
   if (type === DIGITAL_PROFILE_TYPE) return "Perfil digital";
+  if (type === MULTIPLE_CHOICE_TYPE) return "Opción múltiple";
   return "Escala";
 }
 
@@ -937,6 +964,7 @@ function excelWorkbook(sheets) {
 }
 
 function computeStats(session) {
+  if (session?.type === MULTIPLE_CHOICE_TYPE) return computeMultipleChoiceStats(session);
   if (session?.type === FREE_TEXT_TYPE) return computeFreeTextStats(session);
   if (session?.type === "wordcloud") return computeWordCloudStats(session);
   if (session?.type === "quiz") return computeQuizStats(session);
@@ -947,6 +975,24 @@ function computeStats(session) {
   const scaleMax = Number(session?.scaleMax || 10);
   const distribution = Array.from({ length: scaleMax }, (_, index) => values.filter((value) => value === index + 1).length);
   return { average, count, distribution, max: Math.max(1, ...distribution) };
+}
+
+function computeMultipleChoiceStats(session) {
+  const options = session?.multipleChoice?.options || [];
+  const votes = Object.values(session?.votes || {});
+  const distribution = options.map((_, optionIndex) => votes.filter((vote) => Number(vote.answers?.optionIndex) === optionIndex).length);
+  const count = votes.length;
+  const maxCount = Math.max(0, ...distribution);
+  const leaders = options.filter((_, index) => distribution[index] === maxCount && maxCount > 0);
+  let summary = "Aún no hay respuestas para resumir.";
+  if (leaders.length === 1) {
+    const index = options.indexOf(leaders[0]);
+    const percent = Math.round((distribution[index] / count) * 100);
+    summary = `La opción más seleccionada es “${leaders[0]}”, con ${distribution[index]} ${distribution[index] === 1 ? "respuesta" : "respuestas"} (${percent}%).`;
+  } else if (leaders.length > 1) {
+    summary = `Hay un empate entre ${leaders.map((option) => `“${option}”`).join(", ")}, con ${maxCount} respuestas cada una.`;
+  }
+  return { average: count, count, distribution, max: Math.max(1, maxCount), options, summary };
 }
 
 function scoreQuiz(session, answers) {
@@ -1318,7 +1364,7 @@ function hostSetupView() {
       <section class="host-portal">
         <form class="panel setup-panel" data-action="createSessionForm">
           <p class="eyebrow">Crear sesión</p>
-          <h1>${appState.surveyType === "quiz" ? "Nuevo quiz" : appState.surveyType === "wordcloud" ? "Nueva nube de palabras" : appState.surveyType === FREE_TEXT_TYPE ? "Nuevo texto libre" : appState.surveyType === DIGITAL_PROFILE_TYPE ? "Nuevo Perfil digital" : "Nueva escala"}</h1>
+          <h1>${appState.surveyType === "quiz" ? "Nuevo quiz" : appState.surveyType === "wordcloud" ? "Nueva nube de palabras" : appState.surveyType === FREE_TEXT_TYPE ? "Nuevo texto libre" : appState.surveyType === DIGITAL_PROFILE_TYPE ? "Nuevo Perfil digital" : appState.surveyType === MULTIPLE_CHOICE_TYPE ? "Nueva encuesta de opción múltiple" : "Nueva escala"}</h1>
           <input type="hidden" name="type" value="${appState.surveyType}" />
           ${
             appState.surveyType === "quiz"
@@ -1340,6 +1386,16 @@ function hostSetupView() {
                   ? `<div class="scale-config">
                     <label for="setup-question">Pregunta</label>
                     <textarea id="setup-question" name="question" rows="3">Comparte tu opinión sobre esta experiencia</textarea>
+                    <label for="setup-duration">Tiempo máximo de vigencia en minutos</label>
+                    <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
+                  </div>`
+                : appState.surveyType === MULTIPLE_CHOICE_TYPE
+                  ? `<div class="scale-config multiple-choice-config">
+                    <label for="setup-question">Pregunta</label>
+                    <textarea id="setup-question" name="question" rows="3" required>¿Cuál opción prefieres?</textarea>
+                    <label for="multiple-choice-options">Opciones de respuesta</label>
+                    <textarea id="multiple-choice-options" name="multipleChoiceOptions" rows="7" required placeholder="Una opción por línea">Opción 1\nOpción 2\nOpción 3</textarea>
+                    <small class="muted">Escribe una opción por línea (mínimo 2).</small>
                     <label for="setup-duration">Tiempo máximo de vigencia en minutos</label>
                     <input id="setup-duration" name="durationMinutes" type="number" min="1" max="240" value="10" />
                   </div>`
@@ -1398,6 +1454,7 @@ function surveyTypeChoiceView() {
         ${hostActionCard("quiz", "Quiz", "Preguntas con respuestas correctas, puntos y puntaje final.", "quiz")}
         ${hostActionCard("wordcloud", "Nube de palabras", "Respuestas abiertas que forman una figura según frecuencia.", "wordcloud")}
         ${hostActionCard(FREE_TEXT_TYPE, "Texto libre", "Preguntas abiertas con resumen y análisis de respuestas.", "text")}
+        ${hostActionCard(MULTIPLE_CHOICE_TYPE, "Opción múltiple", "Una pregunta con respuestas predeterminadas, conteos y resumen sin puntaje.", "choice")}
         ${hostActionCard(DIGITAL_PROFILE_TYPE, "Perfil digital", "Clasifica canales tradicionales, híbridos, digitales y muy digitales.", "digitalprofile")}
       </section>
       ${footer()}
@@ -1435,6 +1492,9 @@ function hostCardSvg(icon) {
   }
   if (icon === "digitalprofile") {
     return `<svg viewBox="0 0 120 120"><rect x="24" y="24" width="72" height="72" rx="16"/><path d="M42 76h36M42 60h20M60 44h18"/><circle cx="42" cy="44" r="5"/><path d="M80 72l10 10 18-24"/></svg>`;
+  }
+  if (icon === "choice") {
+    return `<svg viewBox="0 0 120 120"><rect x="25" y="28" width="18" height="18" rx="5"/><path d="m30 37 5 5 10-14M54 37h40"/><rect x="25" y="54" width="18" height="18" rx="5"/><path d="M54 63h40"/><rect x="25" y="80" width="18" height="18" rx="5"/><path d="M54 89h40"/></svg>`;
   }
   return `<svg viewBox="0 0 120 120"><rect x="24" y="28" width="72" height="58" rx="12"/><path d="M40 68h12M58 68h12M76 68h12M40 50h12M58 50h12M76 50h12"/></svg>`;
 }
@@ -1565,7 +1625,7 @@ function adminSessionRow(session) {
   const links = sessionLinks(session.code);
   const typeLabel = surveyTypeLabel(session.type);
   const annualFormatter = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
-  const metricValue = session.type === "wordcloud" || session.type === FREE_TEXT_TYPE
+  const metricValue = session.type === "wordcloud" || session.type === FREE_TEXT_TYPE || session.type === MULTIPLE_CHOICE_TYPE
     ? `${stats.count} respuestas`
     : session.type === DIGITAL_PROFILE_TYPE
       ? (stats.count ? annualFormatter.format(stats.average) : "--")
@@ -1635,6 +1695,7 @@ function avatarOption(id, label, icon, color, checked) {
 }
 
 function waitingView(session) {
+  if (session.type === MULTIPLE_CHOICE_TYPE) return multipleChoiceParticipantView(session);
   if (session.type === "wordcloud") return wordCloudParticipantView(session);
   if (session.type === FREE_TEXT_TYPE) return freeTextParticipantView(session);
   if (session.type === "quiz") return quizParticipantView(session);
@@ -1668,6 +1729,14 @@ function waitingView(session) {
       ${footer()}
     </main>
   `;
+}
+
+function multipleChoiceParticipantView(session) {
+  const voted = Boolean(session.votes[appState.user?.id]);
+  const closed = isSessionClosed(session);
+  const options = session.multipleChoice?.options || [];
+  const selectedText = options[Number(session.votes[appState.user?.id]?.answers?.optionIndex)] || "";
+  return `<main class="app-grid">${roomHeader(session)}<section class="panel question-panel"><p class="eyebrow">Opción múltiple · ${closed ? "Cerrada" : `Tiempo restante ${formatRemaining(session)}`}</p><h1>${escapeHtml(session.question)}</h1><p>${Object.keys(session.votes || {}).length} respuestas recibidas</p></section>${voted ? `<section class="panel compact thank-you-panel">${thankYouContent(selectedText)}</section>` : `<form class="panel quiz-answer-form" data-action="multipleChoiceSubmitForm"><fieldset class="quiz-answer-question multiple-choice-answers"><legend>Selecciona una respuesta</legend>${options.map((option, index) => `<label class="answer-option"><input type="radio" name="multipleChoiceAnswer" value="${index}" ${closed ? "disabled" : ""} required /><span>${escapeHtml(option)}</span></label>`).join("")}</fieldset><button class="primary full" type="submit" ${closed ? "disabled" : ""}>Enviar respuesta</button></form>`}${footer()}</main>`;
 }
 
 function wordCloudParticipantView(session) {
@@ -1955,6 +2024,7 @@ function hostView(session) {
 
 function resultsSidePanel(session) {
   const stats = computeStats(session);
+  if (session.type === MULTIPLE_CHOICE_TYPE) return multipleChoiceResultsPanel(stats);
   if (session.type === "wordcloud") {
     return `
       <div class="panel results-side wordcloud-side">
@@ -1984,6 +2054,10 @@ function resultsSidePanel(session) {
       ${trendPanel(session)}
     </div>
   `;
+}
+
+function multipleChoiceResultsPanel(stats) {
+  return `<div class="panel results-side multiple-choice-results"><h2>Resultados por opción</h2><div class="choice-result-bars">${stats.options.map((option, index) => { const count = stats.distribution[index] || 0; const percent = stats.count ? Math.round((count / stats.count) * 100) : 0; return `<div class="choice-result"><div><span>${escapeHtml(option)}</span><strong>${count} · ${percent}%</strong></div><div class="choice-track"><span style="width:${percent}%"></span></div></div>`; }).join("")}</div><div class="choice-summary"><strong>Resumen</strong><p>${escapeHtml(stats.summary)}</p></div></div>`;
 }
 
 function freeTextResultsPanel(stats) {
@@ -2280,12 +2354,12 @@ function liveResultsPanel(session) {
         </div>
         <div class="metric-card average-card ${session.type === "wordcloud" || session.type === FREE_TEXT_TYPE ? "wordcloud-average-card" : ""} ${isDigitalProfile ? "digital-average-card" : ""}">
           <div>
-            <p class="eyebrow">${session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" || session.type === FREE_TEXT_TYPE ? "Respuestas" : isDigitalProfile ? "Valor promedio" : "Promedio en vivo"}</p>
-            <h1>${session.type === "wordcloud" || session.type === FREE_TEXT_TYPE ? stats.count : isDigitalProfile ? (stats.count ? formatCop(stats.average) : "--") : stats.count ? stats.average.toFixed(1) : "--"}</h1>
+            <p class="eyebrow">${session.type === "quiz" ? "Promedio puntos" : session.type === "wordcloud" || session.type === FREE_TEXT_TYPE || session.type === MULTIPLE_CHOICE_TYPE ? "Respuestas" : isDigitalProfile ? "Valor promedio" : "Promedio en vivo"}</p>
+            <h1>${session.type === "wordcloud" || session.type === FREE_TEXT_TYPE || session.type === MULTIPLE_CHOICE_TYPE ? stats.count : isDigitalProfile ? (stats.count ? formatCop(stats.average) : "--") : stats.count ? stats.average.toFixed(1) : "--"}</h1>
             <p>${stats.count} respuestas de ${Object.keys(session.participants).length} participantes</p>
           </div>
           ${isDigitalProfile ? `<div class="digital-average-analysis"><strong>Análisis</strong><p>${escapeHtml(digitalProfileAverageAnalysis(stats))}</p></div>` : ""}
-          ${session.type === "quiz" || session.type === "wordcloud" || session.type === FREE_TEXT_TYPE || isDigitalProfile ? "" : thermometer(stats.average, true)}
+          ${session.type === "quiz" || session.type === "wordcloud" || session.type === FREE_TEXT_TYPE || session.type === MULTIPLE_CHOICE_TYPE || isDigitalProfile ? "" : thermometer(stats.average, true)}
         </div>
       </div>
       <div class="live-voters ${isDigitalProfile ? "digital-live-voters" : ""}" aria-live="polite">
@@ -2611,7 +2685,7 @@ document.addEventListener("click", async (event) => {
     appState.hostSection = "history";
     render();
   }
-  if (["scale", "quiz", "wordcloud", FREE_TEXT_TYPE, DIGITAL_PROFILE_TYPE].includes(hostCard)) {
+  if (["scale", "quiz", "wordcloud", FREE_TEXT_TYPE, DIGITAL_PROFILE_TYPE, MULTIPLE_CHOICE_TYPE].includes(hostCard)) {
     appState.surveyType = hostCard;
     appState.hostSection = "create";
     render();
@@ -2672,6 +2746,7 @@ document.addEventListener("submit", async (event) => {
     const type = new FormData(form).get("type");
     const questions = type === "quiz" ? parseQuizForm(form) : [];
     const digitalProfileQuestions = type === DIGITAL_PROFILE_TYPE ? parseDigitalProfileForm(form) : [];
+    const multipleChoiceOptions = type === MULTIPLE_CHOICE_TYPE ? String(new FormData(form).get("multipleChoiceOptions") || "").split(/\r?\n/).map((option) => option.trim()).filter(Boolean) : [];
     if (type === "quiz" && !questions.length) {
       toast("Agrega al menos una pregunta para el quiz.");
       return;
@@ -2680,12 +2755,14 @@ document.addEventListener("submit", async (event) => {
       toast("Agrega al menos una pregunta para Perfil digital.");
       return;
     }
+    if (type === MULTIPLE_CHOICE_TYPE && multipleChoiceOptions.length < 2) { toast("Agrega al menos dos opciones de respuesta."); return; }
     await createSession({
       type,
       question: type === "quiz" ? "Quiz" : type === DIGITAL_PROFILE_TYPE ? digitalProfileSurvey.title : new FormData(form).get("question"),
       scaleMax: new FormData(form).get("scaleMax"),
       questions,
       digitalProfileQuestions,
+      multipleChoiceOptions,
       durationMinutes: new FormData(form).get("durationMinutes")
     });
   }
@@ -2693,6 +2770,7 @@ document.addEventListener("submit", async (event) => {
   if (action === "wordCloudSubmitForm") await submitWordCloud(event);
   if (action === "freeTextSubmitForm") await submitFreeText(event);
   if (action === "digitalProfileSubmitForm") await submitDigitalProfile(event);
+  if (action === "multipleChoiceSubmitForm") await submitMultipleChoice(event);
 });
 
 document.addEventListener("change", (event) => {

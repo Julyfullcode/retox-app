@@ -1871,6 +1871,17 @@ footer {
   background: linear-gradient(135deg, #80bd28, #1f6fb2);
 }
 
+.host-card-art.choice { color: #7257d9; background: #eeeaff; }
+.choice-result-bars { display: grid; gap: 16px; margin-top: 18px; }
+.choice-result > div:first-child { display: flex; justify-content: space-between; gap: 18px; margin-bottom: 7px; }
+.choice-result span { overflow-wrap: anywhere; }
+.choice-result strong { white-space: nowrap; }
+.choice-track { height: 14px; overflow: hidden; border-radius: 999px; background: rgba(102, 86, 155, .14); }
+.choice-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #7257d9, #35a878); transition: width .35s ease; }
+.choice-summary { margin-top: 24px; padding: 18px; border-radius: 16px; background: rgba(114, 87, 217, .1); }
+.choice-summary p { margin: 8px 0 0; line-height: 1.5; }
+.multiple-choice-answers .answer-option { cursor: pointer; }
+
 .back-button {
   width: fit-content;
   min-height: 42px;
