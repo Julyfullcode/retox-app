@@ -2419,18 +2419,20 @@ function multipleChoiceLiveMetrics(session, stats, links) {
   const closed = isSessionClosed(session);
   return `
     <div class="multiple-choice-overview ${closed ? "closed" : ""}">
-      <div class="choice-overview-time">
-        <span>${closed ? "Votación cerrada" : "Tiempo restante"}</span>
-        <strong>${formatRemaining(session)}</strong>
-      </div>
       <a class="choice-overview-qr" href="${links.invite}" target="_blank" rel="noreferrer" aria-label="Abrir invitación con QR">
-        <img src="${qrUrl(links.participant, 112)}" alt="QR para ingresar a la encuesta" />
+        <img src="${qrUrl(links.participant, 220)}" alt="QR para ingresar a la encuesta" />
         <small>Escanea para participar</small>
       </a>
-      <div class="choice-overview-responses">
-        <span>Respuestas</span>
-        <strong>${stats.count}</strong>
-        <small>${stats.count} respuestas de ${Object.keys(session.participants).length} participantes</small>
+      <div class="choice-overview-grid">
+        <div class="choice-overview-time">
+          <span>${closed ? "Votación cerrada" : "Tiempo restante"}</span>
+          <strong>${formatRemaining(session)}</strong>
+        </div>
+        <div class="choice-overview-responses">
+          <span>Respuestas</span>
+          <strong>${stats.count}</strong>
+          <small>${stats.count} respuestas de ${Object.keys(session.participants).length} participantes</small>
+        </div>
       </div>
     </div>`;
 }
